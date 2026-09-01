@@ -312,6 +312,19 @@ final class AnalyzerModel {
         return result
     }
 
+    /// The frequency window every chart shares, spanning everything visible.
+    ///
+    /// Not each chart's own extent: sweeping a narrower range than the files being
+    /// compared against would otherwise crop them to the new measurement, and switching
+    /// between the SWR and R/X views would move the axis underneath the reader. The
+    /// widest sample present wins, and the window only changes when what is visible does.
+    var frequencyWindow: ClosedRange<Double>? {
+        let megahertz = visibleTraces.flatMap { $0.points.map(\.frequency.megahertz) }
+        guard let low = megahertz.min(), let high = megahertz.max(), high > low else { return nil }
+        let margin = (high - low) * 0.01
+        return Swift.max(0, low - margin)...(high + margin)
+    }
+
     /// The correction belongs to the live measurement only.
     private func correctedIfLive(_ points: [MeasurementPoint]) -> [MeasurementPoint] {
         guard let calibration = activeCalibration else { return points }

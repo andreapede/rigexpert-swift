@@ -12,6 +12,8 @@ struct SWRChart: View {
     var rawPoints: [MeasurementPoint] = []
     var cursorFrequency: Double?
     var strings: Strings
+    /// The window shared by every chart, when more than one trace is on screen.
+    var frequencyWindow: ClosedRange<Double>?
 
     /// One plotted sample.
     ///
@@ -35,7 +37,7 @@ struct SWRChart: View {
         // Both series share the axis, so both have to fit in it.
         let peak = (samples + raw + comparisons.flatMap(\.samples)).compactMap(\.swr).max()
         let ceiling = Self.ceiling(for: peak)
-        let span = Self.frequencySpan(samples + raw)
+        let span = frequencyWindow ?? Self.frequencySpan(samples + raw + comparisons.flatMap(\.samples))
 
         Chart {
             if ceiling > 2 {

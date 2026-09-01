@@ -11,6 +11,8 @@ struct ImpedanceChart: View {
     let points: [MeasurementPoint]
     var cursorFrequency: Double?
     var strings: Strings
+    /// The window shared by every chart, when more than one trace is on screen.
+    var frequencyWindow: ClosedRange<Double>?
 
     private struct Sample: Identifiable {
         let id: Int
@@ -60,7 +62,7 @@ struct ImpedanceChart: View {
         }
         .chartForegroundStyleScale(["R": Color.accentColor, "X": Color.purple])
         .chartYScale(domain: -limit...limit)
-        .chartXScale(domain: Self.span(points))
+        .chartXScale(domain: frequencyWindow ?? Self.span(points))
         .chartXAxisLabel("MHz")
         .chartYAxisLabel("Ω")
         .chartLegend(position: .top, alignment: .leading)

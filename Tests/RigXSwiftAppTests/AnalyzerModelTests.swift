@@ -118,6 +118,30 @@ struct AnalyzerModelTests {
         #expect(model.displayedPoints.count == loaded.sweep.points.count)
     }
 
+    @Test("The frequency window covers every visible trace, not just the selected one")
+    func windowSpansEverythingVisible() async throws {
+        let model = await Self.connectedModel { SimulatedAnalyzerChannel() }
+        let wide = Self.trace(named: "wide", resistance: 60)   // 1–170 MHz
+        model.loadedTraces = [wide]
+
+        // A narrower live measurement, of the kind that used to crop the file it was
+        // being compared against.
+        model.startMegahertz = 1
+        model.endMegahertz = 30
+        model.points = 40
+        await model.runSweep()
+
+        #expect(model.selection == .live)
+        let window = try #require(model.frequencyWindow)
+        #expect(window.upperBound > 169, "the wider file still has to fit: \(window)")
+        #expect(window.lowerBound <= 1)
+
+        // Hiding the wide trace hands the window back to the measurement alone.
+        model.loadedTraces[0].isVisible = false
+        let narrowed = try #require(model.frequencyWindow)
+        #expect(narrowed.upperBound < 31, "nothing wide is visible any more: \(narrowed)")
+    }
+
     @Test("A sweep that succeeds shows itself")
     func successfulSweepBecomesVisible() async throws {
         let model = await Self.connectedModel { SimulatedAnalyzerChannel() }

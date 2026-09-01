@@ -359,11 +359,17 @@ struct ContentView: View {
                 bestMatch: model.bestMatch,
                 rawPoints: model.showRawTrace && model.activeCalibration != nil ? model.rawPoints : [],
                 cursorFrequency: cursorFrequency,
-                strings: s
+                strings: s,
+                frequencyWindow: model.frequencyWindow
             )
             .chartCursor(frequency: $cursorFrequency)
         case .impedance:
-            ImpedanceChart(points: model.displayedPoints, cursorFrequency: cursorFrequency, strings: s)
+            ImpedanceChart(
+                points: model.displayedPoints,
+                cursorFrequency: cursorFrequency,
+                strings: s,
+                frequencyWindow: model.frequencyWindow
+            )
                 .chartCursor(frequency: $cursorFrequency)
         case .tdr:
             TDRChart(response: model.tdr, strings: s)
