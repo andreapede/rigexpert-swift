@@ -408,7 +408,7 @@ struct ContentView: View {
             HStack(spacing: 24) {
                 readout(
                     s.minimumSWR,
-                    String(format: "%.3f  a %.4f MHz", minimum.swr, minimum.frequency.megahertz)
+                    s.swrAt(minimum.swr, megahertz: minimum.frequency.megahertz)
                 )
                 readout(s.resonance, resonanceText)
                 readout("R", String(format: "%.2f Ω", best.impedance.resistance))

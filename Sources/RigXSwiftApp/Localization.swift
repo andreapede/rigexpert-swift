@@ -102,6 +102,12 @@ struct Strings {
     var cursor: String { pick("Cursore", "Cursor") }
     var swr: String { pick("SWR", "SWR") }
     var minimumSWR: String { pick("SWR minimo", "Lowest SWR") }
+    /// The joining word inside a formatted readout. Easy to leave behind in a format
+    /// string, where it hides from any search for user-visible text.
+    func swrAt(_ swr: Double, megahertz: Double) -> String {
+        pick(String(format: "%.3f  a %.4f MHz", swr, megahertz),
+             String(format: "%.3f  at %.4f MHz", swr, megahertz))
+    }
     var resonance: String { pick("Risonanza (X=0)", "Resonance (X=0)") }
     var noResonance: String { pick("nessuna nella banda", "none in this range") }
     func crossingsAreTheLine(_ count: Int) -> String {
