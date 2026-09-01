@@ -1,13 +1,12 @@
 import RigXCore
 import RigXTransport
+import AppKit
+import RigXIO
 import SwiftUI
 import UniformTypeIdentifiers
 
 struct ContentView: View {
     @State private var model = AnalyzerModel()
-    @State private var isExporting = false
-    @State private var isImportingCalibration = false
-    @State private var isImportingSweep = false
     @State private var chartKind: ChartKind = .swr
     /// Frequency under the pointer, in MHz. Nil when the pointer is elsewhere.
     @State private var cursorFrequency: Double?
@@ -30,35 +29,49 @@ struct ContentView: View {
             detail
         }
         .frame(minWidth: 900, minHeight: 560)
-        .fileExporter(
-            isPresented: $isExporting,
-            document: TouchstoneDocument(sweep: model.sweep),
-            contentType: .data,
-            defaultFilename: "sweep.s1p"
-        ) { result in
-            if case .failure(let error) = result {
-                model.errorMessage = error.localizedDescription
-            }
+    }
+
+    // MARK: - File dialogs
+    //
+    // AppKit's panels rather than SwiftUI's fileImporter/fileExporter. Those are
+    // presentation modifiers, and inside a NavigationSplitView they can decline to
+    // appear at all — silently, with no error and no callback. A panel that opens
+    // every time is worth more than one that is idiomatic.
+
+    private func openSweeps() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        panel.message = s.openSweep
+        guard panel.runModal() == .OK else { return }
+        model.loadSweeps(from: panel.urls)
+    }
+
+    private func openCalibration() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.allowedContentTypes = [.json]
+        panel.message = s.loadFile
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        model.loadCalibration(from: url)
+    }
+
+    private func exportSweep() {
+        guard let sweep = model.sweep else { return }
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "sweep.s1p"
+        panel.message = s.exportTouchstone
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try TouchstoneFile(points: sweep.points, referenceImpedance: sweep.referenceImpedance)
+                .write(to: url)
+        } catch {
+            model.errorMessage = error.localizedDescription
         }
     }
 
     private var sidebar: some View {
-        // One presentation modifier per view. Stacking two fileImporters and a
-        // fileExporter on the same view leaves only one of them working, silently.
-        sidebarForm
-            .fileImporter(
-                isPresented: $isImportingSweep,
-                allowedContentTypes: [.data],
-                allowsMultipleSelection: true
-            ) { result in
-                switch result {
-                case .success(let urls): model.loadSweeps(from: urls)
-                case .failure(let error): model.errorMessage = error.localizedDescription
-                }
-            }
-    }
-
-    private var sidebarForm: some View {
         Form {
             Section(s.traces) {
                 Picker(selection: $model.selection) {
@@ -91,7 +104,7 @@ struct ContentView: View {
                     }
                 }
 
-                Button(s.openSweep, systemImage: "doc.badge.plus") { isImportingSweep = true }
+                Button(s.openSweep, systemImage: "doc.badge.plus") { openSweeps() }
                 if !model.loadedTraces.isEmpty {
                     Text(s.comparisonNote).font(.caption).foregroundStyle(.secondary)
                 }
@@ -157,7 +170,7 @@ struct ContentView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                Button(s.loadFile, systemImage: "folder") { isImportingCalibration = true }
+                Button(s.loadFile, systemImage: "folder") { openCalibration() }
             }
 
             Section(s.sweep) {
@@ -282,19 +295,6 @@ struct ContentView: View {
     }
 
     private var detail: some View {
-        detailContent
-            .fileImporter(
-                isPresented: $isImportingCalibration,
-                allowedContentTypes: [.json, .data]
-            ) { result in
-                switch result {
-                case .success(let url): model.loadCalibration(from: url)
-                case .failure(let error): model.errorMessage = error.localizedDescription
-                }
-            }
-    }
-
-    private var detailContent: some View {
         VStack(spacing: 0) {
             if model.isSweeping {
                 ProgressView(value: model.progress)
@@ -340,7 +340,7 @@ struct ContentView: View {
             }
             ToolbarItem(placement: .primaryAction) {
                 Button(s.exportTouchstone, systemImage: "square.and.arrow.up") {
-                    isExporting = true
+                    exportSweep()
                 }
                 .disabled(model.sweep == nil)
             }
