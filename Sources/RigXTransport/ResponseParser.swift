@@ -1,4 +1,4 @@
-import AntScopeCore
+import RigXCore
 import Foundation
 
 /// Turns the analyzer's byte stream into decoded responses.

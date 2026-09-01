@@ -1,4 +1,4 @@
-import AntScopeCore
+import RigXCore
 import Foundation
 
 /// A bidirectional byte pipe to an analyzer.

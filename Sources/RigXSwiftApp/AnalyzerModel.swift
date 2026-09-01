@@ -1,6 +1,6 @@
-import AntScopeCore
-import AntScopeIO
-import AntScopeTransport
+import RigXCore
+import RigXIO
+import RigXTransport
 import Foundation
 import Observation
 
@@ -15,6 +15,15 @@ final class AnalyzerModel {
 
         var isConnected: Bool { if case .connected = self { true } else { false } }
     }
+
+    /// Persisted, so the choice survives a relaunch; follows the system on first run.
+    var language: Language = Language(
+        rawValue: UserDefaults.standard.string(forKey: "language") ?? ""
+    ) ?? .systemDefault {
+        didSet { UserDefaults.standard.set(language.rawValue, forKey: "language") }
+    }
+
+    var strings: Strings { Strings(language: language) }
 
     var ports: [SerialPortInfo] = []
     var selectedPort: String?
@@ -66,14 +75,14 @@ final class AnalyzerModel {
         do {
             let loaded = try JSONDecoder().decode(Calibration.self, from: Data(contentsOf: url))
             guard loaded.isUsable else {
-                errorMessage = "Il file di calibrazione non contiene abbastanza punti."
+                errorMessage = strings.calibrationTooShort
                 return
             }
             calibration = loaded
             calibrationPath = url.path
             UserDefaults.standard.set(url.path, forKey: Self.calibrationDefaultsKey)
         } catch {
-            errorMessage = "Calibrazione non leggibile: \(error.localizedDescription)"
+            errorMessage = "\(strings.calibrationUnreadable): \(error.localizedDescription)"
         }
     }
 
@@ -260,11 +269,11 @@ final class AnalyzerModel {
     private func describe(_ error: any Error) -> String {
         switch error {
         case AnalyzerSession.SessionError.timedOut(let what):
-            "Nessuna risposta dall'analizzatore (\(what)). Controlla porta, baud rate e cablaggio."
+            strings.noReply(what)
         case AnalyzerSession.SessionError.analyzerReportedError:
-            "L'analizzatore ha rifiutato la richiesta."
+            strings.analyzerRefused
         case ChannelError.cannotOpen(let path, _):
-            "Impossibile aprire \(path)."
+            strings.cannotOpen(path)
         default:
             String(describing: error)
         }

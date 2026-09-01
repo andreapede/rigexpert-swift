@@ -1,12 +1,12 @@
-import AntScopeCore
-import AntScopeIO
+import RigXCore
+import RigXIO
 import SwiftUI
 import UniformTypeIdentifiers
 
 @main
-struct AntScopeApp: App {
+struct RigXSwiftApp: App {
     var body: some Scene {
-        WindowGroup("AntScope") {
+        WindowGroup("RigXSwift") {
             ContentView()
         }
         .defaultSize(width: 1100, height: 640)

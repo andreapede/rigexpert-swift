@@ -1,5 +1,5 @@
-import AntScopeCore
-import AntScopeTransport
+import RigXCore
+import RigXTransport
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -10,6 +10,8 @@ struct ContentView: View {
     @State private var chartKind: ChartKind = .swr
     /// Frequency under the pointer, in MHz. Nil when the pointer is elsewhere.
     @State private var cursorFrequency: Double?
+
+    private var s: Strings { model.strings }
 
     enum ChartKind: String, CaseIterable, Identifiable {
         case swr = "SWR"
@@ -46,22 +48,22 @@ struct ContentView: View {
 
     private var sidebar: some View {
         Form {
-            Section("Collegamento") {
-                Picker("Porta", selection: $model.selectedPort) {
+            Section(s.connection) {
+                Picker(s.port, selection: $model.selectedPort) {
                     ForEach(model.ports) { port in
                         Text(port.name).tag(Optional(port.path))
                     }
                 }
                 .disabled(model.connection.isConnected)
 
-                Picker("Baud", selection: $model.baudRate) {
-                    Text("115200 · bridge Arduino").tag(Int32(115200))
-                    Text("38400 · diretto").tag(Int32(38400))
+                Picker(s.baud, selection: $model.baudRate) {
+                    Text(s.baudBridge).tag(Int32(115200))
+                    Text(s.baudDirect).tag(Int32(38400))
                 }
                 .disabled(model.connection.isConnected)
 
                 HStack {
-                    Button("Aggiorna", systemImage: "arrow.clockwise") { model.refreshPorts() }
+                    Button(s.refresh, systemImage: "arrow.clockwise") { model.refreshPorts() }
                         .disabled(model.connection.isConnected)
                     Spacer()
                     connectButton
@@ -69,63 +71,63 @@ struct ContentView: View {
             }
 
             if case .connected(let version) = model.connection {
-                Section("Analizzatore") {
-                    LabeledContent("Modello", value: version.model)
-                    LabeledContent("Firmware", value: version.firmware)
+                Section(s.analyzer) {
+                    LabeledContent(s.model, value: version.model)
+                    LabeledContent(s.firmware, value: version.firmware)
                     if let range = version.profile?.frequencyRange {
-                        LabeledContent("Banda", value: "\(range.lowerBound) – \(range.upperBound)")
+                        LabeledContent(s.band, value: "\(range.lowerBound) – \(range.upperBound)")
                     }
                 }
             }
 
-            Section("Calibrazione") {
+            Section(s.calibration) {
                 if let calibration = model.calibration {
-                    Toggle("Applica correzione", isOn: $model.applyCalibration)
+                    Toggle(s.applyCorrection, isOn: $model.applyCalibration)
                         .onChange(of: model.applyCalibration) { model.recomputeCable() }
-                    Toggle("Mostra traccia grezza", isOn: $model.showRawTrace)
+                    Toggle(s.showRawTrace, isOn: $model.showRawTrace)
                         .disabled(!model.applyCalibration)
                     if let range = calibration.frequencyRange {
-                        LabeledContent("Banda", value: "\(range.lowerBound) – \(range.upperBound)")
+                        LabeledContent(s.band, value: "\(range.lowerBound) – \(range.upperBound)")
                     }
-                    LabeledContent("Punti", value: "\(calibration.points.count)")
-                    LabeledContent("Data", value: calibration.date.formatted(date: .abbreviated, time: .shortened))
+                    LabeledContent(s.points, value: "\(calibration.points.count)")
+                    LabeledContent(s.date, value: calibration.date.formatted(date: .abbreviated, time: .shortened))
                     if model.sweepExceedsCalibration {
                         Label(
-                            "Lo sweep esce dalla banda calibrata: fuori range la correzione è tenuta ferma all'estremo più vicino.",
+                            s.outOfCalibratedBand,
                             systemImage: "exclamationmark.triangle"
                         )
                         .foregroundStyle(.orange)
                         .font(.caption)
                     }
-                    Button("Rimuovi", role: .destructive) { model.clearCalibration() }
+                    Button(s.remove, role: .destructive) { model.clearCalibration() }
                 } else {
-                    Text("Nessuna calibrazione caricata.")
+                    Text(s.noCalibration)
                         .font(.callout)
                         .foregroundStyle(.secondary)
-                    Text("Creane una con  antscope-probe calibrate")
+                    Text(s.createOneWith)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                Button("Carica file…", systemImage: "folder") { isImportingCalibration = true }
+                Button(s.loadFile, systemImage: "folder") { isImportingCalibration = true }
             }
 
-            Section("Sweep") {
-                LabeledContent("Da") {
+            Section(s.sweep) {
+                LabeledContent(s.from) {
                     TextField("MHz", value: $model.startMegahertz, format: .number)
                         .multilineTextAlignment(.trailing)
                 }
-                LabeledContent("A") {
+                LabeledContent(s.to) {
                     TextField("MHz", value: $model.endMegahertz, format: .number)
                         .multilineTextAlignment(.trailing)
                 }
-                Picker("Punti", selection: $model.points) {
+                Picker(s.points, selection: $model.points) {
                     ForEach([50, 100, 200, 500, 1000], id: \.self) { Text("\($0)").tag($0) }
                 }
 
                 Button {
                     Task { await model.runSweep() }
                 } label: {
-                    Label(model.isSweeping ? "Misura in corso…" : "Avvia sweep", systemImage: "play.fill")
+                    Label(model.isSweeping ? s.sweeping : s.startSweep, systemImage: "play.fill")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
@@ -133,46 +135,46 @@ struct ContentView: View {
             }
 
             if let feedline = model.feedline {
-                Section("Linea di discesa") {
-                    Text("\(feedline.crossingCount) attraversamenti X=0 a passo regolare: appartengono alla linea, non all'antenna. Per la risonanza guarda lo SWR minimo, che il cavo non sposta.")
+                Section(s.feedline) {
+                    Text(s.feedlineExplanation(feedline.crossingCount))
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    LabeledContent("Passo", value: String(format: "%.2f MHz", feedline.crossingSpacing.megahertz))
-                    LabeledContent("Lunghezza elettrica", value: String(format: "%.3f m", feedline.electricalLength))
-                    LabeledContent("Lunghezza fisica") {
+                    LabeledContent(s.spacing, value: String(format: "%.2f MHz", feedline.crossingSpacing.megahertz))
+                    LabeledContent(s.electricalLength, value: String(format: "%.3f m", feedline.electricalLength))
+                    LabeledContent(s.physicalLength) {
                         TextField("m", value: $model.knownCableLength, format: .number)
                             .multilineTextAlignment(.trailing)
                     }
                     if model.knownCableLength > 0 {
                         LabeledContent(
-                            "Fattore di velocità",
+                            s.velocityFactor,
                             value: String(format: "%.4f", feedline.velocityFactor(physicalLength: model.knownCableLength))
                         )
                     } else {
-                        LabeledContent("con VF 0,66", value: String(format: "%.3f m", feedline.physicalLength(velocityFactor: 0.66)))
+                        LabeledContent(s.atVelocityFactor("0.66"), value: String(format: "%.3f m", feedline.physicalLength(velocityFactor: 0.66)))
                     }
-                    LabeledContent("Irregolarità", value: String(format: "%.1f%%", feedline.irregularity * 100))
+                    LabeledContent(s.irregularity, value: String(format: "%.1f%%", feedline.irregularity * 100))
                 }
             }
 
             if let cable = model.cable, cable.isCredible {
-                Section("Cavo") {
-                    LabeledContent("Ritardo", value: String(format: "%.2f ns", cable.roundTripDelay * 1e9))
-                    LabeledContent("Lunghezza elettrica", value: String(format: "%.3f m", cable.electricalLength))
-                    LabeledContent("Lunghezza fisica") {
+                Section(s.cable) {
+                    LabeledContent(s.delay, value: String(format: "%.2f ns", cable.roundTripDelay * 1e9))
+                    LabeledContent(s.electricalLength, value: String(format: "%.3f m", cable.electricalLength))
+                    LabeledContent(s.physicalLength) {
                         TextField("m", value: $model.knownCableLength, format: .number)
                             .multilineTextAlignment(.trailing)
                     }
                     if model.knownCableLength > 0 {
                         LabeledContent(
-                            "Fattore di velocità",
+                            s.velocityFactor,
                             value: String(format: "%.4f", cable.velocityFactor(physicalLength: model.knownCableLength))
                         )
                     } else {
-                        LabeledContent("con VF 0,66", value: String(format: "%.3f m", cable.physicalLength(velocityFactor: 0.66)))
-                        LabeledContent("con VF 0,80", value: String(format: "%.3f m", cable.physicalLength(velocityFactor: 0.80)))
+                        LabeledContent(s.atVelocityFactor("0.66"), value: String(format: "%.3f m", cable.physicalLength(velocityFactor: 0.66)))
+                        LabeledContent(s.atVelocityFactor("0.80"), value: String(format: "%.3f m", cable.physicalLength(velocityFactor: 0.80)))
                     }
-                    LabeledContent("Residuo", value: String(format: "%.5f", cable.residual))
+                    LabeledContent(s.residual, value: String(format: "%.5f", cable.residual))
                 }
             }
 
@@ -198,9 +200,9 @@ struct ContentView: View {
             }
         } label: {
             switch model.connection {
-            case .connecting: Text("Collegamento…")
-            case .connected: Text("Disconnetti")
-            case .disconnected: Text("Collega")
+            case .connecting: Text(s.connecting)
+            case .connected: Text(s.disconnect)
+            case .disconnected: Text(s.connect)
             }
         }
         .disabled(model.selectedPort == nil || model.connection == .connecting)
@@ -230,14 +232,28 @@ struct ContentView: View {
         }
         .toolbar {
             ToolbarItem(placement: .principal) {
-                Picker("Grafico", selection: $chartKind) {
+                Picker(s.chart, selection: $chartKind) {
                     ForEach(ChartKind.allCases) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.segmented)
                 .frame(width: 240)
             }
+            ToolbarItem(placement: .automatic) {
+                // Icon only and unlabelled: switching language is done once and then
+                // never again, so it should not compete with the controls that are.
+                Menu {
+                    Picker(s.uiLanguage, selection: $model.language) {
+                        ForEach(Language.allCases) { Text($0.name).tag($0) }
+                    }
+                    .pickerStyle(.inline)
+                } label: {
+                    Image(systemName: "globe")
+                }
+                .menuIndicator(.hidden)
+                .help(s.uiLanguage)
+            }
             ToolbarItem(placement: .primaryAction) {
-                Button("Esporta .s1p", systemImage: "square.and.arrow.up") {
+                Button(s.exportTouchstone, systemImage: "square.and.arrow.up") {
                     isExporting = true
                 }
                 .disabled(model.sweep == nil)
@@ -253,11 +269,12 @@ struct ContentView: View {
                 points: model.displayedPoints,
                 bestMatch: model.bestMatch,
                 rawPoints: model.showRawTrace && model.activeCalibration != nil ? model.rawPoints : [],
-                cursorFrequency: cursorFrequency
+                cursorFrequency: cursorFrequency,
+                strings: s
             )
             .chartCursor(frequency: $cursorFrequency)
         case .impedance:
-            ImpedanceChart(points: model.displayedPoints, cursorFrequency: cursorFrequency)
+            ImpedanceChart(points: model.displayedPoints, cursorFrequency: cursorFrequency, strings: s)
                 .chartCursor(frequency: $cursorFrequency)
         case .smith:
             SmithChart(
@@ -265,7 +282,8 @@ struct ContentView: View {
                 referenceImpedance: model.displayedSweep.referenceImpedance,
                 highlighted: model.bestMatch,
                 cursor: cursorPoint,
-                feedlineDetected: model.feedline != nil
+                feedlineDetected: model.feedline != nil,
+                strings: s
             )
         }
     }
@@ -281,8 +299,8 @@ struct ContentView: View {
     private func cursorReadout(_ point: MeasurementPoint) -> some View {
         let gamma = point.reflection(referenceImpedance: model.displayedSweep.referenceImpedance)
         return HStack(spacing: 24) {
-            readout("Cursore", String(format: "%.4f MHz", point.frequency.megahertz))
-            readout("SWR", gamma.swr.map { String(format: "%.3f", $0) } ?? "—")
+            readout(s.cursor, String(format: "%.4f MHz", point.frequency.megahertz))
+            readout(s.swr, gamma.swr.map { String(format: "%.3f", $0) } ?? "—")
             readout("R", String(format: "%.2f Ω", point.impedance.resistance))
             readout("X", String(format: "%.2f Ω", point.impedance.reactance))
             readout("|Z|", String(format: "%.2f Ω", point.impedance.magnitude))
@@ -298,14 +316,14 @@ struct ContentView: View {
             let gamma = best.reflection(referenceImpedance: model.displayedSweep.referenceImpedance)
             HStack(spacing: 24) {
                 readout(
-                    "SWR minimo",
+                    s.minimumSWR,
                     String(format: "%.3f  a %.4f MHz", minimum.swr, minimum.frequency.megahertz)
                 )
-                readout("Risonanza (X=0)", resonanceText)
+                readout(s.resonance, resonanceText)
                 readout("R", String(format: "%.2f Ω", best.impedance.resistance))
                 readout("X", String(format: "%.2f Ω", best.impedance.reactance))
-                readout("Return loss", String(format: "%.1f dB", gamma.returnLossDecibels))
-                readout("Escursione SWR", swrSpread)
+                readout(s.returnLoss, String(format: "%.1f dB", gamma.returnLossDecibels))
+                readout(s.swrSpread, swrSpread)
                 Spacer()
                 qualityReadout
             }
@@ -319,9 +337,9 @@ struct ContentView: View {
     /// wrong one.
     private var resonanceText: String {
         if let feedline = model.feedline {
-            return "\(feedline.crossingCount) attraversamenti · è la linea"
+            return s.crossingsAreTheLine(feedline.crossingCount)
         }
-        guard let resonance = model.resonance else { return "nessuna nella banda" }
+        guard let resonance = model.resonance else { return s.noResonance }
         return String(
             format: "%.4f MHz  ·  R %.1f Ω",
             resonance.frequency.megahertz, resonance.resistance
@@ -352,15 +370,15 @@ struct ContentView: View {
     private var qualityReadout: some View {
         let quality = model.displayedSweep.quality
         if quality.isClean {
-            readout("Punti", "\(quality.sampleCount)")
+            readout(s.points, "\(quality.sampleCount)")
         } else {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Punti").font(.caption).foregroundStyle(.secondary)
+                Text(s.points).font(.caption).foregroundStyle(.secondary)
                 HStack(spacing: 5) {
                     Text("\(quality.sampleCount)").font(.system(.body, design: .monospaced))
                     Image(systemName: quality.deservesRepeating
                           ? "exclamationmark.triangle.fill" : "exclamationmark.circle")
-                    Text("\(quality.faultCount) persi")
+                    Text("\(quality.faultCount) \(s.lost)")
                         .font(.system(.body, design: .monospaced))
                 }
                 .foregroundStyle(quality.deservesRepeating ? .orange : .secondary)
@@ -374,12 +392,12 @@ struct ContentView: View {
         if !quality.saturated.isEmpty {
             let list = quality.saturated.prefix(6).map { String(format: "%.2f", $0.megahertz) }
                 .joined(separator: ", ")
-            lines.append("|Γ| ≥ 1 a \(list) MHz\(quality.saturated.count > 6 ? " …" : "")")
+            lines.append(s.lostSamplesDetail(list, more: quality.saturated.count > 6))
         }
         if !quality.malformed.isEmpty {
-            lines.append("\(quality.malformed.count) campioni non numerici")
+            lines.append(s.malformedSamples(quality.malformed.count))
         }
-        lines.append("Campioni che l'analizzatore non è riuscito a misurare: riflessione superiore all'unità, che un carico passivo non può produrre.")
+        lines.append(s.lostSamplesExplanation)
         return lines.joined(separator: "\n")
     }
 

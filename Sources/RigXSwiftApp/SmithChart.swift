@@ -1,4 +1,4 @@
-import AntScopeCore
+import RigXCore
 import SwiftUI
 
 /// The Smith chart, drawn by hand.
@@ -16,6 +16,7 @@ struct SmithChart: View {
     /// When a feedline is between the analyzer and the antenna, the trace is rotated by
     /// it, and the upper/lower halves no longer say "too long" and "too short".
     var feedlineDetected: Bool = false
+    var strings: Strings
 
     /// Normalised resistances and reactances to rule.
     private let resistanceGrid: [Double] = [0.2, 0.5, 1, 2, 5]
@@ -135,9 +136,9 @@ struct SmithChart: View {
 
             // Labels for someone who has never seen one of these.
             let hint = GraphicsContext.Shading.color(.secondary)
-            context.draw(Text("corto").font(.system(size: 9)).foregroundStyle(.secondary),
+            context.draw(Text(strings.smithShort).font(.system(size: 9)).foregroundStyle(.secondary),
                          at: CGPoint(x: center.x - radius + 18, y: center.y - 10))
-            context.draw(Text("aperto").font(.system(size: 9)).foregroundStyle(.secondary),
+            context.draw(Text(strings.smithOpen).font(.system(size: 9)).foregroundStyle(.secondary),
                          at: CGPoint(x: center.x + radius - 18, y: center.y - 10))
             context.draw(Text("50 Ω").font(.system(size: 9)).foregroundStyle(.secondary),
                          at: CGPoint(x: center.x + 16, y: center.y + 9))
@@ -173,10 +174,7 @@ struct SmithChart: View {
     private var caption: String {
         // Kept outside the circle rather than drawn on it: inside, this text sat across
         // the constant-SWR ring labels and made them unreadable.
-        let rings = "cerchi verdi tratteggiati: SWR 1,5 · 2 · 3 — più vicino al centro, meglio adattato"
-        let halves = "metà superiore induttiva (X > 0), inferiore capacitiva (X < 0)"
-        return feedlineDetected
-            ? "\(rings)\n\(halves) — ma con la discesa di mezzo NON indicano antenna lunga o corta: è il cavo che ruota la traccia"
-            : "\(rings)\n\(halves) — sopra l'asse antenna elettricamente lunga, sotto corta"
+        let tail = feedlineDetected ? strings.smithHalvesRotated : strings.smithHalvesMeaning
+        return "\(strings.smithRings)\n\(strings.smithHalves)\(tail)"
     }
 }

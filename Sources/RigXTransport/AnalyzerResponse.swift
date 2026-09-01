@@ -1,4 +1,4 @@
-import AntScopeCore
+import RigXCore
 import Foundation
 
 /// One decoded line from the analyzer.

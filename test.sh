@@ -1,5 +1,5 @@
 #!/bin/bash
-# Runs the AntScopeKit test suite.
+# Runs the RigXSwift test suite.
 #
 # Swift Testing ships inside the Command Line Tools but SwiftPM only wires up its
 # search paths when a full Xcode is selected, so point at them explicitly. Once

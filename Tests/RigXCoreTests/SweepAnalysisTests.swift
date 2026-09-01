@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import AntScopeCore
+@testable import RigXCore
 
 @Suite("Sweep analysis")
 struct SweepAnalysisTests {

@@ -1,4 +1,4 @@
-import AntScopeCore
+import RigXCore
 import Foundation
 
 /// A conversation with one analyzer.

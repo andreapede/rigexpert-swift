@@ -1,5 +1,5 @@
 #!/bin/bash
-# Builds AntScope.app.
+# Builds RigXSwift.app.
 #
 # There is no .xcodeproj on purpose: the package is the source of truth, and the bundle
 # is assembled around the executable SwiftPM produces. Xcode can still open Package.swift
@@ -8,7 +8,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 CONFIG="${1:-release}"
-APP="build/AntScope.app"
+APP="build/RigXSwift.app"
 
 if [ -d /Applications/Xcode.app ] && [ "$(xcode-select -p)" != "/Applications/Xcode.app/Contents/Developer" ]; then
   # SwiftUI needs Xcode's toolchain; use it without changing the system-wide selection.
@@ -16,26 +16,26 @@ if [ -d /Applications/Xcode.app ] && [ "$(xcode-select -p)" != "/Applications/Xc
 fi
 
 echo "Building ($CONFIG)…"
-swift build -c "$CONFIG" --product AntScopeApp
+swift build -c "$CONFIG" --product RigXSwiftApp
 
 # --show-bin-path also writes progress lines to stdout, so keep only the last one:
 # an unfiltered command substitution yields a path with build chatter glued to the front.
-BIN="$(swift build -c "$CONFIG" --product AntScopeApp --show-bin-path 2>/dev/null | tail -1)"
-test -x "$BIN/AntScopeApp" || { echo "executable not found in $BIN" >&2; exit 1; }
+BIN="$(swift build -c "$CONFIG" --product RigXSwiftApp --show-bin-path 2>/dev/null | tail -1)"
+test -x "$BIN/RigXSwiftApp" || { echo "executable not found in $BIN" >&2; exit 1; }
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$BIN/AntScopeApp" "$APP/Contents/MacOS/AntScope"
+cp "$BIN/RigXSwiftApp" "$APP/Contents/MacOS/RigXSwift"
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleName</key><string>AntScope</string>
-    <key>CFBundleDisplayName</key><string>AntScope</string>
-    <key>CFBundleIdentifier</key><string>com.andreapede.AntScope</string>
-    <key>CFBundleExecutable</key><string>AntScope</string>
+    <key>CFBundleName</key><string>RigXSwift</string>
+    <key>CFBundleDisplayName</key><string>RigXSwift</string>
+    <key>CFBundleIdentifier</key><string>com.andreapede.RigXSwift</string>
+    <key>CFBundleExecutable</key><string>RigXSwift</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>0.1</string>
     <key>CFBundleVersion</key><string>1</string>

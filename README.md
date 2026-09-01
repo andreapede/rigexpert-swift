@@ -1,6 +1,10 @@
 # rigexpert-swift
 
-A native macOS application and Swift package for RigExpert antenna analyzers.
+**RigXSwift** — a native macOS application and Swift package for RigExpert antenna
+analyzers.
+
+> Not affiliated with, endorsed by, or supported by Rig Expert Ukraine Ltd. "RigExpert"
+> and "AntScope" are their names, used here only to say which hardware this works with.
 
 Not a port of AntScope2. No source is shared with it — the AA serial protocol, the
 analyzer capability table and the OSL calibration algebra were read out of its
@@ -39,18 +43,18 @@ System repeatability, from two sweeps taken without touching anything: **±120 k
 
 ## Getting started
 
-    ./make_app.sh                       # builds build/AntScope.app
+    ./make_app.sh                       # builds build/RigXSwift.app
     ./test.sh                           # 88 tests
 
 The command line client needs no UI and is the quickest way to check a connection:
 
     swift build
-    .build/debug/antscope-probe demo                    # against a simulated analyzer
-    .build/debug/antscope-probe ports
-    .build/debug/antscope-probe identify /dev/cu.usbserial-3130 --baud 115200
-    .build/debug/antscope-probe sweep /dev/cu.usbserial-3130 1 30 200 --out antenna.s1p
-    .build/debug/antscope-probe calibrate /dev/cu.usbserial-3130 0.1 30 501 --out cal.json
-    .build/debug/antscope-probe cable Examples/rg174-1.01m-shorted.s1p --length 1.01
+    .build/debug/rigx-probe demo                    # against a simulated analyzer
+    .build/debug/rigx-probe ports
+    .build/debug/rigx-probe identify /dev/cu.usbserial-3130 --baud 115200
+    .build/debug/rigx-probe sweep /dev/cu.usbserial-3130 1 30 200 --out antenna.s1p
+    .build/debug/rigx-probe calibrate /dev/cu.usbserial-3130 0.1 30 501 --out cal.json
+    .build/debug/rigx-probe cable Examples/rg174-1.01m-shorted.s1p --length 1.01
 
 `make_app.sh` builds the bundle around the executable SwiftPM produces; there is no
 `.xcodeproj`. Xcode still opens `Package.swift` directly. When `xcode-select` points at
@@ -61,11 +65,11 @@ it needs no `sudo`.
 
 | module | contents |
 |---|---|
-| `AntScopeCore` | `Frequency`, `Impedance`, `Reflection`, `Sweep`, `DeviceProfile`, `Calibration`, cable and sweep analysis |
-| `AntScopeIO` | Touchstone `.s1p` |
-| `AntScopeTransport` | the AA protocol, `AnalyzerSession`, `SerialChannel`, and a simulated analyzer |
-| `AntScopeApp` | the SwiftUI app |
-| `antscope-probe` | command line client |
+| `RigXCore` | `Frequency`, `Impedance`, `Reflection`, `Sweep`, `DeviceProfile`, `Calibration`, cable and sweep analysis |
+| `RigXIO` | Touchstone `.s1p` |
+| `RigXTransport` | the AA protocol, `AnalyzerSession`, `SerialChannel`, and a simulated analyzer |
+| `RigXSwiftApp` | the SwiftUI app |
+| `rigx-probe` | command line client |
 
 `Reflection` is the hub: SWR, return loss, ρ, phase and the Smith coordinate are all
 functions of Γ, so they derive from one type rather than being recomputed in six places.
@@ -83,21 +87,16 @@ another implementation and nothing above it would change.
 ## Hardware
 
 The AA-30.ZERO has no USB of its own: it needs 5 V, ground and a 3.3 V UART at 38400 baud.
-`Arduino/AntScopeBridge` carries those bytes to the Mac. See its header comment for wiring.
+`Arduino/RigXBridge` carries those bytes to the Mac. Stack the shield on an Arduino
+UNO R3, upload, and the analyzer appears as an ordinary serial port. The Mac side of the
+bridge runs at 115200, which is why `--baud 115200` appears in the examples above.
 
-One trap is worth repeating here. **On an Arduino UNO R4 this does not work with the shield
-simply stacked.** The Renesas core supports SoftwareSerial reception only on pins 6, 11 and
-12, and the analyzer's output lands on D4. Transmission works, reception silently receives
-nothing, and the symptom is indistinguishable from a dead analyzer — the ZERO's Rx and Tx
-LEDs both blink while the bridge reads zero bytes. An UNO R3 has pin-change interrupts on
-every pin and works unmodified. On an R4, run two wires to D0/D1 and use the hardware UART.
-
-Also: on the UNO R4 WiFi the USB-C port is bridged by the ESP32-S3 rather than being native
-CDC, so the baud rate on the Mac side is real and must match the sketch.
+Other Arduino boards are not covered: the analyzer's UART lands on D4 and D7, and whether
+a board can receive on those pins depends on its core rather than on its speed.
 
 ## Known limitations
 
-- The user interface is in Italian; the code and its comments are in English
+- Italian and English only, switchable from the globe in the toolbar
 - The app loads a calibration but cannot capture one — that flow is on the command line
 - The Smith chart shows the cursor but cannot set it; use the SWR or R/X view
 - No TDR yet
@@ -112,7 +111,7 @@ Andrea Pede, **IZ0TWS**.
 The RigExpert AA protocol, the analyzer capability table and the OSL correction were
 derived by reading [AntScope2](https://github.com/rigexpert/AntScope2), which is
 MIT-licensed; its copyright notice is retained in `LICENSE`. The three `.s1p` fixtures
-under `Tests/AntScopeIOTests/Fixtures` are that project's own files, used here only to
+under `Tests/RigXIOTests/Fixtures` are that project's own files, used here only to
 exercise the parser — they are not usable calibration standards, all three read close to
 an open.
 

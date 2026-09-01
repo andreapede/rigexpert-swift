@@ -1,6 +1,6 @@
-import AntScopeCore
+import RigXCore
 import Testing
-@testable import AntScopeTransport
+@testable import RigXTransport
 
 @Suite("Commands")
 struct AnalyzerCommandTests {

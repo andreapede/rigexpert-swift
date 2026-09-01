@@ -1,4 +1,4 @@
-import AntScopeCore
+import RigXCore
 import Foundation
 
 /// A command in the RigExpert AA text protocol.

@@ -1,4 +1,4 @@
-import AntScopeCore
+import RigXCore
 import Charts
 import SwiftUI
 
@@ -9,6 +9,7 @@ struct SWRChart: View {
     /// Drawn faintly behind, when the reader wants to see what the correction did.
     var rawPoints: [MeasurementPoint] = []
     var cursorFrequency: Double?
+    var strings: Strings
 
     /// One plotted sample.
     ///
@@ -45,7 +46,7 @@ struct SWRChart: View {
 
             ForEach(raw) { sample in
                 LineMark(
-                    x: .value("Frequenza", sample.megahertz),
+                    x: .value(strings.frequency, sample.megahertz),
                     y: .value("SWR", min(sample.swr ?? ceiling, ceiling)),
                     series: .value("Traccia", "grezza")
                 )
@@ -56,7 +57,7 @@ struct SWRChart: View {
 
             ForEach(samples) { sample in
                 LineMark(
-                    x: .value("Frequenza", sample.megahertz),
+                    x: .value(strings.frequency, sample.megahertz),
                     y: .value("SWR", min(sample.swr ?? ceiling, ceiling)),
                     series: .value("Traccia", "misura")
                 )
@@ -65,14 +66,14 @@ struct SWRChart: View {
             }
 
             if let cursorFrequency {
-                RuleMark(x: .value("Cursore", cursorFrequency))
+                RuleMark(x: .value(strings.cursor, cursorFrequency))
                     .foregroundStyle(.orange.opacity(0.7))
                     .lineStyle(StrokeStyle(lineWidth: 1))
             }
 
             if let bestMatch, let swr = bestMatch.reflection().swr {
                 PointMark(
-                    x: .value("Frequenza", bestMatch.frequency.megahertz),
+                    x: .value(strings.frequency, bestMatch.frequency.megahertz),
                     y: .value("SWR", min(swr, ceiling))
                 )
                 .symbolSize(70)
@@ -116,9 +117,9 @@ struct SWRChart: View {
         .overlay {
             if points.isEmpty {
                 ContentUnavailableView(
-                    "Nessuna misura",
+                    strings.noMeasurement,
                     systemImage: "waveform.path.ecg",
-                    description: Text("Collegati all'analizzatore e avvia uno sweep.")
+                    description: Text(strings.connectAndSweep)
                 )
             }
         }

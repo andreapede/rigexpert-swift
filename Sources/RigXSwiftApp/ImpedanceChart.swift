@@ -1,4 +1,4 @@
-import AntScopeCore
+import RigXCore
 import Charts
 import SwiftUI
 
@@ -10,6 +10,7 @@ import SwiftUI
 struct ImpedanceChart: View {
     let points: [MeasurementPoint]
     var cursorFrequency: Double?
+    var strings: Strings
 
     private struct Sample: Identifiable {
         let id: Int
@@ -43,7 +44,7 @@ struct ImpedanceChart: View {
 
             ForEach(samples) { sample in
                 LineMark(
-                    x: .value("Frequenza", sample.megahertz),
+                    x: .value(strings.frequency, sample.megahertz),
                     y: .value("Ω", sample.value),
                     series: .value("Serie", sample.series)
                 )
@@ -52,7 +53,7 @@ struct ImpedanceChart: View {
             }
 
             if let cursorFrequency {
-                RuleMark(x: .value("Cursore", cursorFrequency))
+                RuleMark(x: .value(strings.cursor, cursorFrequency))
                     .foregroundStyle(.orange.opacity(0.7))
                     .lineStyle(StrokeStyle(lineWidth: 1))
             }
@@ -66,9 +67,9 @@ struct ImpedanceChart: View {
         .overlay {
             if points.isEmpty {
                 ContentUnavailableView(
-                    "Nessuna misura",
+                    strings.noMeasurement,
                     systemImage: "waveform.path",
-                    description: Text("Collegati all'analizzatore e avvia uno sweep.")
+                    description: Text(strings.connectAndSweep)
                 )
             }
         }

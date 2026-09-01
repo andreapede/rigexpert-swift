@@ -1,6 +1,6 @@
-import AntScopeCore
-import AntScopeIO
-import AntScopeTransport
+import RigXCore
+import RigXIO
+import RigXTransport
 import Foundation
 
 /// A minimal command line client, so an analyzer can be exercised the moment it is
@@ -28,7 +28,7 @@ struct Probe {
 
     static func usage() {
         print("""
-        antscope-probe — talk to a RigExpert analyzer
+        rigx-probe — talk to a RigExpert analyzer
 
           ports                                    list serial ports
           identify <port> [--baud N] [--settle S]  ask the analyzer what it is
@@ -388,7 +388,7 @@ enum ProbeError: Error, CustomStringConvertible {
 
     var description: String {
         switch self {
-        case .missingPort: "no serial port given — run `antscope-probe ports` to list them"
+        case .missingPort: "no serial port given — run `rigx-probe ports` to list them"
         case .badArguments: "usage: sweep <port> <startMHz> <endMHz> <points> [--out file.s1p]"
         case .calibrationFailed: "i tre sweep non condividono la stessa griglia di frequenze"
         }

@@ -1,7 +1,7 @@
-import AntScopeCore
+import RigXCore
 import Foundation
 import Testing
-@testable import AntScopeTransport
+@testable import RigXTransport
 
 @Suite("Analyzer session")
 struct AnalyzerSessionTests {

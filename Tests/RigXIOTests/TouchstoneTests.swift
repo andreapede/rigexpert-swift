@@ -1,7 +1,7 @@
-import AntScopeCore
+import RigXCore
 import Foundation
 import Testing
-@testable import AntScopeIO
+@testable import RigXIO
 
 @Suite("Touchstone files")
 struct TouchstoneTests {

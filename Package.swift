@@ -2,30 +2,30 @@
 import PackageDescription
 
 let package = Package(
-    name: "AntScopeKit",
+    name: "RigXSwift",
     platforms: [.macOS(.v14)],
     products: [
-        .library(name: "AntScopeCore", targets: ["AntScopeCore"]),
-        .library(name: "AntScopeIO", targets: ["AntScopeIO"]),
-        .library(name: "AntScopeTransport", targets: ["AntScopeTransport"]),
+        .library(name: "RigXCore", targets: ["RigXCore"]),
+        .library(name: "RigXIO", targets: ["RigXIO"]),
+        .library(name: "RigXTransport", targets: ["RigXTransport"]),
     ],
     targets: [
         .executableTarget(
-            name: "AntScopeApp",
-            dependencies: ["AntScopeCore", "AntScopeIO", "AntScopeTransport"]
+            name: "RigXSwiftApp",
+            dependencies: ["RigXCore", "RigXIO", "RigXTransport"]
         ),
         .executableTarget(
-            name: "antscope-probe",
-            dependencies: ["AntScopeCore", "AntScopeIO", "AntScopeTransport"]
+            name: "rigx-probe",
+            dependencies: ["RigXCore", "RigXIO", "RigXTransport"]
         ),
-        .target(name: "AntScopeCore"),
-        .target(name: "AntScopeIO", dependencies: ["AntScopeCore"]),
-        .target(name: "AntScopeTransport", dependencies: ["AntScopeCore"]),
-        .testTarget(name: "AntScopeCoreTests", dependencies: ["AntScopeCore"]),
-        .testTarget(name: "AntScopeTransportTests", dependencies: ["AntScopeTransport"]),
+        .target(name: "RigXCore"),
+        .target(name: "RigXIO", dependencies: ["RigXCore"]),
+        .target(name: "RigXTransport", dependencies: ["RigXCore"]),
+        .testTarget(name: "RigXCoreTests", dependencies: ["RigXCore"]),
+        .testTarget(name: "RigXTransportTests", dependencies: ["RigXTransport"]),
         .testTarget(
-            name: "AntScopeIOTests",
-            dependencies: ["AntScopeIO"],
+            name: "RigXIOTests",
+            dependencies: ["RigXIO"],
             resources: [.copy("Fixtures")]
         ),
     ]

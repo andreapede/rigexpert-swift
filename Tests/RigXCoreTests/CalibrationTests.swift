@@ -1,5 +1,5 @@
 import Testing
-@testable import AntScopeCore
+@testable import RigXCore
 
 @Suite("Complex arithmetic")
 struct ComplexTests {
