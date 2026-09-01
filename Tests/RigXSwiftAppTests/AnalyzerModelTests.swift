@@ -30,18 +30,23 @@ actor MuteAfterIdentifyChannel: ByteChannel {
 @MainActor
 @Suite("Analyzer model")
 struct AnalyzerModelTests {
-    static func trace(named name: String, resistance: Double) -> AnalyzerModel.LoadedTrace {
-        // A line into a mismatch: enough structure for the cable and TDR analyses to
-        // find something, so their disappearance is observable.
+    /// A trace that looks like a cable: a small reflection at the plane and a larger one
+    /// delayed by a round trip. Not an impedance made to wobble — the time-domain view
+    /// needs something with an actual delay in it before it has anything to find.
+    static func trace(
+        named name: String,
+        resistance: Double = 50,
+        delayNanoseconds: Double = 20
+    ) -> AnalyzerModel.LoadedTrace {
+        let near = Complex(0.04 * (resistance / 50), 0)
+        let far = Complex(0.35, 0)
         let points = (0...400).map { index -> MeasurementPoint in
             let megahertz = 1 + Double(index) * (169.0 / 400)
-            let phase = 2 * Double.pi * megahertz * 1e6 * 20e-9
+            let rotor = Complex.unit(angle: -2 * .pi * megahertz * 1e6 * delayNanoseconds * 1e-9)
+            let gamma = near + far * rotor
             return MeasurementPoint(
                 frequency: .megahertz(megahertz),
-                impedance: Impedance(
-                    resistance: resistance + 20 * cos(phase),
-                    reactance: 30 * sin(phase)
-                )
+                impedance: Reflection(gamma).impedance()
             )
         }
         return AnalyzerModel.LoadedTrace(
@@ -184,6 +189,33 @@ struct AnalyzerModelTests {
         model.selection = .live
         #expect(model.canHide(a.id), "nothing loaded is primary now")
         #expect(model.canHide(b.id))
+    }
+
+    @Test("The stored analyses follow the selection, like the charts do")
+    func analysesFollowTheSelection() throws {
+        // The charts read a computed property and follow on their own; the cable and TDR
+        // results are kept, and used to describe whichever trace was selected before.
+        let model = AnalyzerModel()
+        model.calibration = nil
+        let short = Self.trace(named: "short", resistance: 60, delayNanoseconds: 10)
+        let long = Self.trace(named: "long", resistance: 60, delayNanoseconds: 40)
+        model.loadedTraces = [short, long]
+
+        model.selection = .loaded(short.id)
+        let firstTDR: TimeDomainResponse = try #require(model.tdr)
+        let firstMeasurement: CableMeasurement = try #require(model.cable)
+        let firstDistance = firstTDR.dominantDiscontinuity?.distance ?? 0
+        let firstDelay = firstMeasurement.roundTripDelay
+
+        model.selection = .loaded(long.id)
+        let secondTDR: TimeDomainResponse = try #require(model.tdr)
+        let secondMeasurement: CableMeasurement = try #require(model.cable)
+        let secondDistance = secondTDR.dominantDiscontinuity?.distance ?? 0
+        let secondDelay = secondMeasurement.roundTripDelay
+
+        #expect(firstDistance > 0, "the shorter trace has a discontinuity to find")
+        #expect(secondDistance > firstDistance * 2, "the TDR describes the trace now selected")
+        #expect(secondDelay > firstDelay * 2, "and so does the cable measurement")
     }
 
     @Test("A sweep that succeeds shows itself")

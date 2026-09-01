@@ -72,7 +72,16 @@ final class AnalyzerModel {
     }
 
     var loadedTraces: [LoadedTrace] = []
-    var selection: Selection = .live
+
+    /// Which trace everything describes.
+    ///
+    /// The stored analyses have to follow it. The charts read `displayedPoints`, which is
+    /// computed and follows on its own; `cable` and `tdr` are kept, and without this they
+    /// go on describing whichever trace was selected before — the Smith and R/X views
+    /// would change while the TDR did not.
+    var selection: Selection = .live {
+        didSet { recomputeCable() }
+    }
     private var nextColorIndex = 0
 
     /// Recomputed with the cable measurement, not on every redraw.
@@ -255,13 +264,14 @@ final class AnalyzerModel {
         // They are cleared here and rebuilt when the sweep completes; showing the previous
         // trace's cable length beside a new sweep's curve would be worse than showing none.
         let previousSelection = selection
-        selection = .live
-        cable = nil
-        tdr = nil
+        // `isSweeping` first: it makes `sweep` describe the measurement starting rather
+        // than the last one finished, so the recomputation the selection triggers has
+        // nothing stale to work from and clears the analyses.
         isSweeping = true
         progress = 0
         livePoints = []
         errorMessage = nil
+        selection = .live
         defer { isSweeping = false }
 
         do {
