@@ -131,6 +131,28 @@ struct Strings {
     var chart: String { pick("Grafico", "Chart") }
     var uiLanguage: String { pick("Lingua", "Language") }
 
+    // TDR
+    var tdr: String { pick("TDR", "TDR") }
+    var experimental: String { pick("(sperimentale)", "(experimental)") }
+    var window: String { pick("Finestra", "Window") }
+    var distance: String { pick("Distanza", "Distance") }
+    var metres: String { pick("metri", "metres") }
+    var resolution: String { pick("Risoluzione", "Resolution") }
+    var tdrNeedsUniformSweep: String {
+        pick("Il TDR richiede uno sweep su griglia uniforme con almeno 8 punti.",
+             "TDR needs a sweep on a uniform grid with at least 8 points.")
+    }
+    func tdrCaption(resolution: Double, window: String, velocityFactor: Double) -> String {
+        pick(String(format: "risoluzione %.2f m — un picco indicato a una certa distanza significa ± %.2f m · finestra %@ · VF %.3f",
+                    resolution, resolution / 2, window, velocityFactor),
+             String(format: "resolution %.2f m — a peak marked at a distance means ± %.2f m · %@ window · VF %.3f",
+                    resolution, resolution / 2, window, velocityFactor))
+    }
+    var tdrBandwidthNote: String {
+        pick("La risoluzione dipende solo dalla banda misurata: per vedere cavi corti serve arrivare in alto in frequenza.",
+             "Resolution depends only on the measured bandwidth: seeing short cables means sweeping high.")
+    }
+
     // Smith chart
     var smithShort: String { pick("corto", "short") }
     var smithOpen: String { pick("aperto", "open") }

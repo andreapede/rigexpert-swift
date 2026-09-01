@@ -52,6 +52,13 @@ final class AnalyzerModel {
     /// measurement into a velocity factor instead of the other way round.
     var knownCableLength: Double = 0
 
+    /// Recomputed with the cable measurement, not on every redraw.
+    var tdr: TimeDomainResponse?
+    var tdrWindow: TDRWindow = .hann { didSet { recomputeCable() } }
+    /// The cable's velocity factor. It scales the whole distance axis, so it is an input
+    /// to the measurement rather than a result of it.
+    var tdrVelocityFactor: Double = 0.66 { didSet { recomputeCable() } }
+
     var calibration: Calibration?
     var calibrationPath: String?
     var applyCalibration = true
@@ -89,9 +96,11 @@ final class AnalyzerModel {
     func recomputeCable() {
         guard let sweep, sweep.points.count >= 8 else {
             cable = nil
+            tdr = nil
             return
         }
         cable = CableAnalyzer.measure(sweep)
+        tdr = TimeDomain.transform(sweep, velocityFactor: tdrVelocityFactor, window: tdrWindow)
     }
 
     func clearCalibration() {

@@ -16,7 +16,8 @@ Everything below was measured with a real AA-30.ZERO against physical references
 ## What it does
 
 - Connects over a serial port and sweeps
-- Plots SWR, resistance and reactance, and a hand-drawn Smith chart, with a hover cursor
+- Plots SWR, resistance and reactance, a hand-drawn Smith chart, and a time-domain view
+  of the cable, with a hover cursor
 - Applies an open/short/load calibration captured from the command line
 - Measures a coaxial cable's length, velocity factor and loss from the sweep alone
 - Detects when the reactance crossings belong to the feedline rather than the antenna,
@@ -37,6 +38,7 @@ Verified against known references, not asserted:
 | RG-174 loss, 1–30 MHz | ≈0.1 dB/m datasheet | 0.126 dB/m |
 | Feedline length, 1.66 m of cable | 1.66 m + connectors | 1.747 m (8.7 cm over three connector interfaces) |
 | Dipole resonance, 2.04 m tip to tip | 143/L = 70.1 MHz | **70.33 MHz**, 0.33% |
+| Feedline end by TDR | 1.747 m, known two other ways | **1.72 m**, resolution ±0.47 m |
 
 System repeatability, from two sweeps taken without touching anything: **±120 kHz** on a
 67 MHz resonance, about **1%** on |Γ|.
@@ -99,7 +101,7 @@ a board can receive on those pins depends on its core rather than on its speed.
 - Italian and English only, switchable from the globe in the toolbar
 - The app loads a calibration but cannot capture one — that flow is on the command line
 - The Smith chart shows the cursor but cannot set it; use the SWR or R/X view
-- No TDR yet
+- TDR is marked experimental: the transform is validated but new
 - The app's views have no tests. Everything below them does
 
 ## Author

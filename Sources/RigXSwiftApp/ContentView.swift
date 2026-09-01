@@ -17,6 +17,7 @@ struct ContentView: View {
         case swr = "SWR"
         case impedance = "R / X"
         case smith = "Smith"
+        case tdr = "TDR"
         var id: Self { self }
     }
 
@@ -132,6 +133,30 @@ struct ContentView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(!model.connection.isConnected || model.isSweeping)
+            }
+
+            if chartKind == .tdr {
+                Section {
+                    Picker(selection: $model.tdrWindow) {
+                        ForEach(TDRWindow.allCases, id: \.self) { Text($0.name).tag($0) }
+                    } label: {
+                        // The label carries the caveat: the transform is new, and the
+                        // window is the control that most changes what it shows.
+                        Text("\(s.window) \(s.experimental)")
+                    }
+                    LabeledContent(s.velocityFactor) {
+                        TextField("VF", value: $model.tdrVelocityFactor, format: .number)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    if let response = model.tdr {
+                        LabeledContent(s.resolution, value: String(format: "%.2f m", response.resolution))
+                    }
+                    Text(s.tdrBandwidthNote)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } header: {
+                    Text("\(s.tdr) \(s.experimental)")
+                }
             }
 
             if let feedline = model.feedline {
@@ -276,6 +301,8 @@ struct ContentView: View {
         case .impedance:
             ImpedanceChart(points: model.displayedPoints, cursorFrequency: cursorFrequency, strings: s)
                 .chartCursor(frequency: $cursorFrequency)
+        case .tdr:
+            TDRChart(response: model.tdr, strings: s)
         case .smith:
             SmithChart(
                 points: model.displayedPoints,

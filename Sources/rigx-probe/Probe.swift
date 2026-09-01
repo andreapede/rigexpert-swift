@@ -15,6 +15,7 @@ struct Probe {
             case "identify": try await identify(arguments)
             case "sweep": try await sweep(arguments)
             case "cable": try cable(arguments)
+            case "tdr": try tdr(arguments)
             case "calibrate": try await calibrate(arguments)
             case "monitor": try await monitor(arguments)
             case "demo": try await demo()
@@ -35,10 +36,11 @@ struct Probe {
           sweep <port> <startMHz> <endMHz> <points> [--baud N] [--cal cal.json] [--out file.s1p]
           calibrate <port> [startMHz endMHz points] [--baud N] [--out cal.json]
           cable <file.s1p> [--length METRES]       measure a cable from a saved sweep
+          tdr <file.s1p> [--vf F] [--window W]     time domain view of a saved sweep
           monitor <port> [seconds] [--baud N] [--settle S] [--send TEXT]  dump raw bytes
           demo                                     run a sweep against the simulator
 
-        The AA-30 ZERO speaks at 38400, which is the default. Behind the UNO R4 bridge
+        The analyzer speaks at 38400, which is the default. Behind the Arduino bridge
         the Mac side runs at 115200 instead: add --baud 115200.
         """)
     }
@@ -291,6 +293,47 @@ struct Probe {
             return
         }
         report(cable: measurement, knownLength: length)
+    }
+
+    /// Time domain view of a saved sweep.
+    static func tdr(_ arguments: [String]) throws {
+        guard arguments.count > 1 else { throw ProbeError.badArguments }
+        let file = try TouchstoneFile.read(contentsOf: URL(fileURLWithPath: arguments[1]))
+        let sweep = Sweep(name: arguments[1], referenceImpedance: file.referenceImpedance, points: file.points)
+
+        var velocityFactor = 0.66
+        if let flag = arguments.firstIndex(of: "--vf"), arguments.count > flag + 1,
+           let value = Double(arguments[flag + 1]) { velocityFactor = value }
+        var window = TDRWindow.hann
+        if let flag = arguments.firstIndex(of: "--window"), arguments.count > flag + 1,
+           let value = TDRWindow(rawValue: arguments[flag + 1]) { window = value }
+
+        guard let response = TimeDomain.transform(sweep, velocityFactor: velocityFactor, window: window) else {
+            print("sweep non adatto: serve una griglia di frequenze uniforme e almeno 8 punti")
+            return
+        }
+
+        print(String(format: "\n  finestra %@ · VF %.3f", response.window.name, velocityFactor))
+        print(String(format: "  risoluzione %.2f m · portata non ambigua %.0f m",
+                     response.resolution, response.unambiguousRange))
+        if let peak = response.dominantDiscontinuity {
+            print(String(format: "  discontinuità principale a %.2f m  (± %.2f)  ampiezza %.3f",
+                         peak.distance, response.resolution / 2, peak.magnitude))
+        }
+
+        // A coarse profile, one line per resolution cell, out to a few cells past the
+        // strongest feature: printing every bin would imply detail the bandwidth cannot
+        // support.
+        let cell = max(1, Int(response.resolution / max(response.distanceStep, 1e-9) / 4))
+        let limit = min(response.distances.count, cell * 40)
+        print("\n  distanza    |Γ|     Z")
+        print("  ---------------------------")
+        for index in stride(from: 0, to: limit, by: cell) {
+            let bar = String(repeating: "▇", count: min(28, Int(abs(response.impulse[index]) * 120)))
+            print(String(format: "  %6.2f m  %6.3f %6.1f Ω  %@",
+                         response.distances[index], abs(response.impulse[index]),
+                         response.impedance[index], bar))
+        }
     }
 
     static func report(feedline: FeedlineEstimate, knownLength: Double?) {
