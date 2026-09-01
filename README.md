@@ -43,7 +43,9 @@ Verified against known references, not asserted:
 | Feedline end by TDR | 1.747 m, known two other ways | **1.72 m**, resolution ±0.47 m |
 
 System repeatability, from two sweeps taken without touching anything: **±120 kHz** on a
-67 MHz resonance, about **1%** on |Γ|.
+67 MHz resonance, about **1%** on |Γ|. Those two sweeps, and the four that follow them
+through a controlled experiment on feedline length and surroundings, are in
+[`Examples/dipole-experiment`](Examples/dipole-experiment).
 
 ## Getting started
 
