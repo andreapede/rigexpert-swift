@@ -23,6 +23,8 @@ Everything below was measured with a real AA-30.ZERO against physical references
 - Detects when the reactance crossings belong to the feedline rather than the antenna,
   and measures the feedline instead of misreporting it as a resonance
 - Counts the samples the analyzer failed to measure, rather than hiding them
+- Opens saved Touchstone `.s1p` files and overlays them for comparison, from this or any
+  other instrument
 - Exports Touchstone `.s1p`
 
 ## Does it work
@@ -102,6 +104,7 @@ a board can receive on those pins depends on its core rather than on its speed.
 - The app loads a calibration but cannot capture one — that flow is on the command line
 - The Smith chart shows the cursor but cannot set it; use the SWR or R/X view
 - TDR is marked experimental: the transform is validated but new
+- Comparison overlays appear on the SWR chart; the other views draw the selected trace
 - The app's views have no tests. Everything below them does
 
 ## Author

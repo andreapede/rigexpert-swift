@@ -4,6 +4,8 @@ import SwiftUI
 
 /// SWR against frequency — the plot an operator actually looks at.
 struct SWRChart: View {
+    /// Additional traces to compare against, drawn thinner and without markers.
+    var others: [(name: String, points: [MeasurementPoint], colorIndex: Int)] = []
     let points: [MeasurementPoint]
     let bestMatch: MeasurementPoint?
     /// Drawn faintly behind, when the reader wants to see what the correction did.
@@ -29,8 +31,9 @@ struct SWRChart: View {
     var body: some View {
         let samples = Self.samples(from: points)
         let raw = Self.samples(from: rawPoints)
+        let comparisons = others.map { (name: $0.name, samples: Self.samples(from: $0.points), color: Self.palette($0.colorIndex)) }
         // Both series share the axis, so both have to fit in it.
-        let peak = (samples + raw).compactMap(\.swr).max()
+        let peak = (samples + raw + comparisons.flatMap(\.samples)).compactMap(\.swr).max()
         let ceiling = Self.ceiling(for: peak)
         let span = Self.frequencySpan(samples + raw)
 
@@ -53,6 +56,19 @@ struct SWRChart: View {
                 .interpolationMethod(.monotone)
                 .foregroundStyle(.secondary.opacity(0.4))
                 .lineStyle(StrokeStyle(lineWidth: 1))
+            }
+
+            ForEach(comparisons, id: \.name) { comparison in
+                ForEach(comparison.samples) { sample in
+                    LineMark(
+                        x: .value(strings.frequency, sample.megahertz),
+                        y: .value("SWR", min(sample.swr ?? ceiling, ceiling)),
+                        series: .value("Traccia", comparison.name)
+                    )
+                    .interpolationMethod(.monotone)
+                    .foregroundStyle(comparison.color)
+                    .lineStyle(StrokeStyle(lineWidth: 1.2))
+                }
             }
 
             ForEach(samples) { sample in
@@ -142,6 +158,13 @@ struct SWRChart: View {
         let width = span.upperBound - span.lowerBound
         let decimals = width >= 20 ? 0 : (width >= 2 ? 1 : 3)
         return String(format: "%.\(decimals)f", megahertz)
+    }
+
+    /// Distinct hues for the comparison traces; index 0 is the selected one, drawn in
+    /// the accent colour by the block above.
+    static func palette(_ index: Int) -> Color {
+        let colors: [Color] = [.accentColor, .orange, .purple, .teal, .pink, .brown, .indigo]
+        return colors[index % colors.count]
     }
 
     private static func samples(from points: [MeasurementPoint]) -> [Sample] {

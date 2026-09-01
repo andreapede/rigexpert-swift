@@ -133,6 +133,15 @@ struct Strings {
 
     // TDR
     var tdr: String { pick("TDR", "TDR") }
+
+    // Traces
+    var traces: String { pick("Tracce", "Traces") }
+    var liveTrace: String { pick("Misura", "Live") }
+    var openSweep: String { pick("Apri .s1p…", "Open .s1p…") }
+    var comparisonNote: String {
+        pick("Il confronto si vede sul grafico SWR; gli altri mostrano la traccia selezionata. Ai file caricati non viene applicata la calibrazione: potrebbero esserlo già.",
+             "The comparison shows on the SWR chart; the others draw the selected trace. Loaded files are shown as saved — no calibration is applied, since they may already carry one.")
+    }
     var experimental: String { pick("(sperimentale)", "(experimental)") }
     var window: String { pick("Finestra", "Window") }
     var distance: String { pick("Distanza", "Distance") }

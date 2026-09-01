@@ -7,6 +7,7 @@ struct ContentView: View {
     @State private var model = AnalyzerModel()
     @State private var isExporting = false
     @State private var isImportingCalibration = false
+    @State private var isImportingSweep = false
     @State private var chartKind: ChartKind = .swr
     /// Frequency under the pointer, in MHz. Nil when the pointer is elsewhere.
     @State private var cursorFrequency: Double?
@@ -30,6 +31,13 @@ struct ContentView: View {
         }
         .frame(minWidth: 900, minHeight: 560)
         .fileImporter(
+            isPresented: $isImportingSweep,
+            allowedContentTypes: [.data],
+            allowsMultipleSelection: true
+        ) { result in
+            if case .success(let urls) = result { model.loadSweeps(from: urls) }
+        }
+        .fileImporter(
             isPresented: $isImportingCalibration,
             allowedContentTypes: [.json]
         ) { result in
@@ -49,6 +57,43 @@ struct ContentView: View {
 
     private var sidebar: some View {
         Form {
+            Section(s.traces) {
+                Picker(selection: $model.selection) {
+                    Text(s.liveTrace).tag(AnalyzerModel.Selection.live)
+                    ForEach(model.loadedTraces) { trace in
+                        Text(trace.name).tag(AnalyzerModel.Selection.loaded(trace.id))
+                    }
+                } label: { EmptyView() }
+                .pickerStyle(.inline)
+                .labelsHidden()
+
+                ForEach($model.loadedTraces) { $trace in
+                    HStack {
+                        Toggle(isOn: $trace.isVisible) {
+                            Label {
+                                Text(trace.name).lineLimit(1)
+                            } icon: {
+                                Circle()
+                                    .fill(SWRChart.palette(trace.colorIndex))
+                                    .frame(width: 8, height: 8)
+                            }
+                        }
+                        Spacer()
+                        Button {
+                            model.removeTrace(trace.id)
+                        } label: {
+                            Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                Button(s.openSweep, systemImage: "doc.badge.plus") { isImportingSweep = true }
+                if !model.loadedTraces.isEmpty {
+                    Text(s.comparisonNote).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+
             Section(s.connection) {
                 Picker(s.port, selection: $model.selectedPort) {
                     ForEach(model.ports) { port in
@@ -291,6 +336,9 @@ struct ContentView: View {
         switch chartKind {
         case .swr:
             SWRChart(
+                others: model.visibleTraces
+                    .filter { !$0.isSelected }
+                    .map { (name: $0.name, points: $0.points, colorIndex: $0.colorIndex) },
                 points: model.displayedPoints,
                 bestMatch: model.bestMatch,
                 rawPoints: model.showRawTrace && model.activeCalibration != nil ? model.rawPoints : [],

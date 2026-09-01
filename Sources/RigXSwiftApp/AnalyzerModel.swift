@@ -52,6 +52,28 @@ final class AnalyzerModel {
     /// measurement into a velocity factor instead of the other way round.
     var knownCableLength: Double = 0
 
+    /// A sweep read from a file, kept beside the live one for comparison.
+    ///
+    /// Loaded traces are shown exactly as saved: no calibration is applied to them. A file
+    /// may already be corrected, and correcting it twice would be worse than not at all —
+    /// and silently so.
+    struct LoadedTrace: Identifiable, Hashable {
+        let id = UUID()
+        var name: String
+        var sweep: Sweep
+        var isVisible = true
+        var colorIndex: Int
+    }
+
+    /// Which trace the readouts and the analysis describe.
+    enum Selection: Hashable {
+        case live
+        case loaded(UUID)
+    }
+
+    var loadedTraces: [LoadedTrace] = []
+    var selection: Selection = .live
+
     /// Recomputed with the cable measurement, not on every redraw.
     var tdr: TimeDomainResponse?
     var tdrWindow: TDRWindow = .hann { didSet { recomputeCable() } }
@@ -91,6 +113,43 @@ final class AnalyzerModel {
         } catch {
             errorMessage = "\(strings.calibrationUnreadable): \(error.localizedDescription)"
         }
+    }
+
+    /// Reads sweeps from Touchstone files and adds them beside the live one.
+    func loadSweeps(from urls: [URL]) {
+        for url in urls {
+            do {
+                let file = try TouchstoneFile.read(contentsOf: url)
+                let sweep = Sweep(
+                    name: url.deletingPathExtension().lastPathComponent,
+                    referenceImpedance: file.referenceImpedance,
+                    points: file.points
+                )
+                loadedTraces.append(
+                    LoadedTrace(
+                        name: sweep.name,
+                        sweep: sweep,
+                        colorIndex: loadedTraces.count + 1
+                    )
+                )
+                selection = .loaded(loadedTraces[loadedTraces.count - 1].id)
+            } catch {
+                errorMessage = "\(url.lastPathComponent): \(error.localizedDescription)"
+            }
+        }
+        recomputeCable()
+    }
+
+    func removeTrace(_ id: UUID) {
+        loadedTraces.removeAll { $0.id == id }
+        if case .loaded(let selected) = selection, selected == id { selection = .live }
+        recomputeCable()
+    }
+
+    /// The trace every readout and every analysis panel describes.
+    var selectedTrace: LoadedTrace? {
+        guard case .loaded(let id) = selection else { return nil }
+        return loadedTraces.first { $0.id == id }
     }
 
     func recomputeCable() {
@@ -204,17 +263,47 @@ final class AnalyzerModel {
 
     /// The measurement as taken, live points while a sweep is running.
     var rawPoints: [MeasurementPoint] {
-        isSweeping || rawSweep == nil ? livePoints : rawSweep!.points
+        if let selectedTrace { return selectedTrace.sweep.points }
+        return isSweeping || rawSweep == nil ? livePoints : rawSweep!.points
+    }
+
+    /// Everything the comparison view should draw, live first.
+    var visibleTraces: [(name: String, points: [MeasurementPoint], colorIndex: Int, isSelected: Bool)] {
+        var result: [(String, [MeasurementPoint], Int, Bool)] = []
+        let live = isSweeping || rawSweep == nil ? livePoints : rawSweep!.points
+        if !live.isEmpty {
+            result.append((strings.liveTrace, correctedIfLive(live), 0, selection == .live))
+        }
+        for trace in loadedTraces where trace.isVisible {
+            result.append((trace.name, trace.sweep.points, trace.colorIndex, selection == .loaded(trace.id)))
+        }
+        return result
+    }
+
+    /// The correction belongs to the live measurement only.
+    private func correctedIfLive(_ points: [MeasurementPoint]) -> [MeasurementPoint] {
+        guard let calibration = activeCalibration else { return points }
+        let z0 = rawSweep?.referenceImpedance ?? .standardZ0
+        return points.map { point in
+            MeasurementPoint(
+                frequency: point.frequency,
+                impedance: calibration
+                    .corrected(point.reflection(referenceImpedance: z0), at: point.frequency)
+                    .impedance(referenceImpedance: z0)
+            )
+        }
     }
 
     /// The finished sweep with any active correction applied — what gets exported.
     var sweep: Sweep? {
+        if let selectedTrace { return selectedTrace.sweep }
         guard let rawSweep else { return nil }
         return activeCalibration?.corrected(rawSweep) ?? rawSweep
     }
 
     /// The points to draw.
     var displayedPoints: [MeasurementPoint] {
+        if let selectedTrace { return selectedTrace.sweep.points }
         guard let calibration = activeCalibration else { return rawPoints }
         let z0 = rawSweep?.referenceImpedance ?? .standardZ0
         return rawPoints.map { point in
@@ -231,7 +320,8 @@ final class AnalyzerModel {
     /// What is on screen, as a sweep, so the analysis can be asked of it directly —
     /// and so it carries the reference impedance rather than assuming 50 ohm.
     var displayedSweep: Sweep {
-        Sweep(
+        if let selectedTrace { return selectedTrace.sweep }
+        return Sweep(
             name: rawSweep?.name ?? "",
             referenceImpedance: rawSweep?.referenceImpedance ?? .standardZ0,
             points: displayedPoints
