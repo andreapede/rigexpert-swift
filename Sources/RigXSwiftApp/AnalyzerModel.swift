@@ -318,8 +318,13 @@ final class AnalyzerModel {
     /// compared against would otherwise crop them to the new measurement, and switching
     /// between the SWR and R/X views would move the axis underneath the reader. The
     /// widest sample present wins, and the window only changes when what is visible does.
+    /// The selected trace is counted whether or not its visibility toggle is on: that
+    /// toggle governs the comparison overlay, while the selection is always the primary
+    /// dataset and is always drawn. Leaving it out cropped a 1-170 MHz trace to the
+    /// window of whatever else happened to be visible.
     var frequencyWindow: ClosedRange<Double>? {
-        let megahertz = visibleTraces.flatMap { $0.points.map(\.frequency.megahertz) }
+        var megahertz = displayedPoints.map(\.frequency.megahertz)
+        megahertz += visibleTraces.flatMap { $0.points.map(\.frequency.megahertz) }
         guard let low = megahertz.min(), let high = megahertz.max(), high > low else { return nil }
         let margin = (high - low) * 0.01
         return Swift.max(0, low - margin)...(high + margin)

@@ -142,6 +142,33 @@ struct AnalyzerModelTests {
         #expect(narrowed.upperBound < 31, "nothing wide is visible any more: \(narrowed)")
     }
 
+    @Test("A selected trace counts even when its visibility is switched off")
+    func hiddenButSelectedTraceStillSetsTheWindow() async throws {
+        // Hiding the selected trace removes it from the comparison overlay but not from
+        // the chart: it is still the primary dataset. A window computed from the visible
+        // traces alone therefore cropped the very trace being drawn.
+        let model = AnalyzerModel()
+        model.calibration = nil
+        model.rawSweep = Sweep(
+            name: "narrow",
+            points: (0...30).map {
+                MeasurementPoint(
+                    frequency: .megahertz(1 + Double($0)),
+                    impedance: Impedance(resistance: 45, reactance: 8)
+                )
+            }
+        )
+
+        let wide = Self.trace(named: "wide", resistance: 60)   // 1–170 MHz
+        model.loadedTraces = [wide]
+        model.selection = .loaded(wide.id)
+        model.loadedTraces[0].isVisible = false
+
+        #expect(model.displayedPoints.last?.frequency.megahertz == 170, "still the primary trace")
+        let window = try #require(model.frequencyWindow)
+        #expect(window.upperBound > 169, "the drawn trace cannot fall outside the axis: \(window)")
+    }
+
     @Test("A sweep that succeeds shows itself")
     func successfulSweepBecomesVisible() async throws {
         let model = await Self.connectedModel { SimulatedAnalyzerChannel() }
