@@ -103,6 +103,10 @@ CDC, so the baud rate on the Mac side is real and must match the sketch.
 - No TDR yet
 - The app's views have no tests. Everything below them does
 
+## Author
+
+Andrea Pede, **IZ0TWS**.
+
 ## Provenance
 
 The RigExpert AA protocol, the analyzer capability table and the OSL correction were
