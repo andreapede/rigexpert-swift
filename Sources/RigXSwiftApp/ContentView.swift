@@ -30,19 +30,6 @@ struct ContentView: View {
             detail
         }
         .frame(minWidth: 900, minHeight: 560)
-        .fileImporter(
-            isPresented: $isImportingSweep,
-            allowedContentTypes: [.data],
-            allowsMultipleSelection: true
-        ) { result in
-            if case .success(let urls) = result { model.loadSweeps(from: urls) }
-        }
-        .fileImporter(
-            isPresented: $isImportingCalibration,
-            allowedContentTypes: [.json]
-        ) { result in
-            if case .success(let url) = result { model.loadCalibration(from: url) }
-        }
         .fileExporter(
             isPresented: $isExporting,
             document: TouchstoneDocument(sweep: model.sweep),
@@ -56,6 +43,22 @@ struct ContentView: View {
     }
 
     private var sidebar: some View {
+        // One presentation modifier per view. Stacking two fileImporters and a
+        // fileExporter on the same view leaves only one of them working, silently.
+        sidebarForm
+            .fileImporter(
+                isPresented: $isImportingSweep,
+                allowedContentTypes: [.data],
+                allowsMultipleSelection: true
+            ) { result in
+                switch result {
+                case .success(let urls): model.loadSweeps(from: urls)
+                case .failure(let error): model.errorMessage = error.localizedDescription
+                }
+            }
+    }
+
+    private var sidebarForm: some View {
         Form {
             Section(s.traces) {
                 Picker(selection: $model.selection) {
@@ -279,6 +282,19 @@ struct ContentView: View {
     }
 
     private var detail: some View {
+        detailContent
+            .fileImporter(
+                isPresented: $isImportingCalibration,
+                allowedContentTypes: [.json, .data]
+            ) { result in
+                switch result {
+                case .success(let url): model.loadCalibration(from: url)
+                case .failure(let error): model.errorMessage = error.localizedDescription
+                }
+            }
+    }
+
+    private var detailContent: some View {
         VStack(spacing: 0) {
             if model.isSweeping {
                 ProgressView(value: model.progress)

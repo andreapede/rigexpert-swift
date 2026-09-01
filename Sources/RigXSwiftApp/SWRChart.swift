@@ -131,7 +131,9 @@ struct SWRChart: View {
             }
         }
         .overlay {
-            if points.isEmpty {
+            // Only when there is genuinely nothing on the chart. Keyed on the primary
+            // trace alone, this covered comparison traces that were drawn perfectly well.
+            if points.isEmpty && others.allSatisfy({ $0.points.isEmpty }) {
                 ContentUnavailableView(
                     strings.noMeasurement,
                     systemImage: "waveform.path.ecg",

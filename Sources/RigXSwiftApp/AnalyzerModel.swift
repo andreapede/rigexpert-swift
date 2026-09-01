@@ -73,6 +73,7 @@ final class AnalyzerModel {
 
     var loadedTraces: [LoadedTrace] = []
     var selection: Selection = .live
+    private var nextColorIndex = 0
 
     /// Recomputed with the cable measurement, not on every redraw.
     var tdr: TimeDomainResponse?
@@ -125,12 +126,11 @@ final class AnalyzerModel {
                     referenceImpedance: file.referenceImpedance,
                     points: file.points
                 )
+                // A running counter, not the array count: deleting a trace and loading
+                // another would otherwise hand out a colour already in use.
+                nextColorIndex += 1
                 loadedTraces.append(
-                    LoadedTrace(
-                        name: sweep.name,
-                        sweep: sweep,
-                        colorIndex: loadedTraces.count + 1
-                    )
+                    LoadedTrace(name: sweep.name, sweep: sweep, colorIndex: nextColorIndex)
                 )
                 selection = .loaded(loadedTraces[loadedTraces.count - 1].id)
             } catch {
@@ -141,8 +141,14 @@ final class AnalyzerModel {
     }
 
     func removeTrace(_ id: UUID) {
+        let wasSelected = selection == .loaded(id)
         loadedTraces.removeAll { $0.id == id }
-        if case .loaded(let selected) = selection, selected == id { selection = .live }
+        if wasSelected {
+            // Fall back to another file before falling back to the live measurement:
+            // with no analyzer connected there is no live trace, and selecting it would
+            // empty every readout while the remaining files are still loaded.
+            selection = loadedTraces.first.map { .loaded($0.id) } ?? .live
+        }
         recomputeCable()
     }
 
