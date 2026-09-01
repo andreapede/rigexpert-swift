@@ -22,6 +22,7 @@ let package = Package(
         .target(name: "RigXIO", dependencies: ["RigXCore"]),
         .target(name: "RigXTransport", dependencies: ["RigXCore"]),
         .testTarget(name: "RigXCoreTests", dependencies: ["RigXCore"]),
+        .testTarget(name: "RigXSwiftAppTests", dependencies: ["RigXSwiftApp"]),
         .testTarget(name: "RigXTransportTests", dependencies: ["RigXTransport"]),
         .testTarget(
             name: "RigXIOTests",

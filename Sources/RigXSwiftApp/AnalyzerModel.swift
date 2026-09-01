@@ -89,8 +89,20 @@ final class AnalyzerModel {
     /// rather than merely asserted.
     var showRawTrace = false
 
-    private var channel: SerialChannel?
+    private var channel: (any ByteChannel)?
     private var session: AnalyzerSession?
+
+    /// How a channel comes into being. A serial port in the app; a simulated analyzer, or
+    /// one that refuses to answer, under test.
+    var makeChannel: @Sendable (String, Int32) async throws -> any ByteChannel = { path, baud in
+        let channel = SerialChannel(path: path, baudRate: baud)
+        try await channel.open()
+        return channel
+    }
+
+    /// Seconds to wait after opening before speaking. Boards with an auto-reset line
+    /// restart when the port opens and lose anything sent during their bootloader.
+    var settleDelay: Duration = .seconds(2)
 
     private static let calibrationDefaultsKey = "lastCalibrationPath"
 
@@ -200,11 +212,8 @@ final class AnalyzerModel {
         errorMessage = nil
         connection = .connecting
         do {
-            let channel = SerialChannel(path: path, baudRate: baudRate)
-            try await channel.open()
-            // Boards with an auto-reset line restart when the port opens; anything sent
-            // during the bootloader window is lost.
-            try await Task.sleep(for: .seconds(2))
+            let channel = try await makeChannel(path, baudRate)
+            try await Task.sleep(for: settleDelay)
             let session = AnalyzerSession(channel: channel)
             await session.start()
             let version = try await session.identify()
@@ -230,6 +239,18 @@ final class AnalyzerModel {
 
     func runSweep() async {
         guard let session, !isSweeping else { return }
+
+        // Starting a measurement is a request to watch it: leaving a loaded file selected
+        // means pressing the button, waiting half a minute and seeing nothing change.
+        //
+        // But switching the selection also invalidates the stored analyses, which describe
+        // the trace that was selected a moment ago and not the measurement now starting.
+        // They are cleared here and rebuilt when the sweep completes; showing the previous
+        // trace's cable length beside a new sweep's curve would be worse than showing none.
+        let previousSelection = selection
+        selection = .live
+        cable = nil
+        tdr = nil
         isSweeping = true
         progress = 0
         livePoints = []
@@ -254,6 +275,11 @@ final class AnalyzerModel {
             recomputeCable()
         } catch {
             errorMessage = describe(error)
+            // A sweep that produced nothing must not silently hand the window to whatever
+            // was measured before it. Put the selection back where the operator left it,
+            // and rebuild the analyses for that trace.
+            selection = previousSelection
+            recomputeCable()
         }
     }
 
@@ -303,6 +329,17 @@ final class AnalyzerModel {
     /// The finished sweep with any active correction applied — what gets exported.
     var sweep: Sweep? {
         if let selectedTrace { return selectedTrace.sweep }
+        // While measuring, this is the measurement in progress — never the previous one.
+        // Otherwise everything downstream, exporting included, would describe a sweep the
+        // window is no longer showing.
+        if isSweeping {
+            guard !livePoints.isEmpty else { return nil }
+            return Sweep(
+                name: sweepName(),
+                referenceImpedance: rawSweep?.referenceImpedance ?? .standardZ0,
+                points: livePoints
+            )
+        }
         guard let rawSweep else { return nil }
         return activeCalibration?.corrected(rawSweep) ?? rawSweep
     }
