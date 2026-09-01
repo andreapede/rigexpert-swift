@@ -152,6 +152,13 @@ final class AnalyzerModel {
         recomputeCable()
     }
 
+    /// Whether a loaded trace's visibility can be switched off.
+    ///
+    /// The selected trace is the primary dataset and is drawn whatever the toggle says, so
+    /// offering it would promise something the chart does not do. The rule lives here
+    /// rather than in the view so that it can be stated once and tested.
+    func canHide(_ id: UUID) -> Bool { selection != .loaded(id) }
+
     func removeTrace(_ id: UUID) {
         let wasSelected = selection == .loaded(id)
         loadedTraces.removeAll { $0.id == id }

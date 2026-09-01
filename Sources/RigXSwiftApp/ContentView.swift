@@ -94,6 +94,8 @@ struct ContentView: View {
                                     .frame(width: 8, height: 8)
                             }
                         }
+                        .disabled(!model.canHide(trace.id))
+                        .help(model.canHide(trace.id) ? "" : s.selectedTraceAlwaysShown)
                         Spacer()
                         Button {
                             model.removeTrace(trace.id)

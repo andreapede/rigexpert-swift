@@ -169,6 +169,23 @@ struct AnalyzerModelTests {
         #expect(window.upperBound > 169, "the drawn trace cannot fall outside the axis: \(window)")
     }
 
+    @Test("The selected trace cannot be hidden, because hiding it would do nothing")
+    func selectedTraceCannotBeHidden() {
+        let model = AnalyzerModel()
+        model.calibration = nil
+        let a = Self.trace(named: "A", resistance: 60)
+        let b = Self.trace(named: "B", resistance: 40)
+        model.loadedTraces = [a, b]
+
+        model.selection = .loaded(a.id)
+        #expect(!model.canHide(a.id), "it is the primary dataset and is drawn regardless")
+        #expect(model.canHide(b.id))
+
+        model.selection = .live
+        #expect(model.canHide(a.id), "nothing loaded is primary now")
+        #expect(model.canHide(b.id))
+    }
+
     @Test("A sweep that succeeds shows itself")
     func successfulSweepBecomesVisible() async throws {
         let model = await Self.connectedModel { SimulatedAnalyzerChannel() }

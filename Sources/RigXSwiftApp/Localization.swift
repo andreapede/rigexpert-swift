@@ -144,6 +144,10 @@ struct Strings {
     var traces: String { pick("Tracce", "Traces") }
     var liveTrace: String { pick("Misura", "Live") }
     var openSweep: String { pick("Apri .s1p…", "Open .s1p…") }
+    var selectedTraceAlwaysShown: String {
+        pick("La traccia selezionata è sempre disegnata: per nasconderla, selezionane un'altra.",
+             "The selected trace is always drawn: to hide it, select another one.")
+    }
     var comparisonNote: String {
         pick("Il confronto si vede sul grafico SWR; gli altri mostrano la traccia selezionata. Ai file caricati non viene applicata la calibrazione: potrebbero esserlo già.",
              "The comparison shows on the SWR chart; the others draw the selected trace. Loaded files are shown as saved — no calibration is applied, since they may already carry one.")
