@@ -116,6 +116,33 @@ struct BandZoomTests {
         #expect(model.zoomRange == nil)
     }
 
+    @Test("The mode segments appear once the chart is showing one band")
+    func segmentsFollowTheZoom() throws {
+        // A sweep across the whole spectrum: 30 m's split between telegraphy and
+        // digimodes is 50 kHz, which here is a third of a pixel.
+        let model = Self.model(Self.twoDips())
+        #expect(model.segmentedBand == nil)
+
+        model.toggleZoom(to: Self.fourMetres)
+        #expect(model.segmentedBand == Self.fourMetres)
+
+        model.toggleZoom(to: Self.fourMetres)
+        #expect(model.segmentedBand == nil)
+    }
+
+    @Test("A sweep of one band alone gets its segments without being zoomed")
+    func narrowSweepShowsSegments() throws {
+        let model = Self.model(Self.twoDips(from: 14, to: 14.35))
+        let band = try #require(model.segmentedBand)
+        #expect(band.name == "20 m")
+        #expect(band.segments.map(\.mode) == [.cw, .digital, .beacon, .phone])
+
+        // But a sweep that merely crosses a band on its way somewhere else does not:
+        // 13–15.5 MHz touches 20 m and nothing else, and is seven times its width.
+        let wider = Self.model(Self.twoDips(from: 13, to: 15.5))
+        #expect(wider.segmentedBand == nil)
+    }
+
     @Test("The cable analyses keep the whole measurement while the charts are zoomed")
     func analysesKeepTheirBandwidth() throws {
         let model = Self.model(AnalyzerModelTests.trace(named: "cable", delayNanoseconds: 20))

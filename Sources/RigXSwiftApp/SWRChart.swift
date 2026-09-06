@@ -16,6 +16,9 @@ struct SWRChart: View {
     var frequencyWindow: ClosedRange<Double>?
     /// Which amateur bands to shade behind the trace. Nil draws none.
     var bandPlan: BandPlan?
+    /// The band whose mode segments are drawn along the foot of the plot, when the chart
+    /// is showing one band closely enough for them to mean anything.
+    var segmentedBand: AmateurBand?
 
     /// One plotted sample.
     ///
@@ -47,6 +50,7 @@ struct SWRChart: View {
         Chart {
             // First, so everything else is drawn on top of it.
             BandShading(bands: bands, span: span)
+            BandSegmentDividers(band: segmentedBand, span: span)
 
             if ceiling > 2 {
                 RuleMark(y: .value("SWR", 2))
@@ -123,6 +127,7 @@ struct SWRChart: View {
         // zero — a frequency that does not exist. Pin it to the measurement instead.
         .chartXScale(domain: span)
         .bandNames(bands, span: span)
+        .bandSegments(segmentedBand, span: span, strings: strings)
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 9)) { value in
                 AxisGridLine().foregroundStyle(.secondary.opacity(0.18))

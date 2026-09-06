@@ -213,6 +213,12 @@ struct ContentView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                if let segmented = model.segmentedBand, !segmented.segments.isEmpty {
+                    segmentLegend(segmented)
+                } else if model.zoomedBand != nil, model.zoomRange != nil {
+                    // Zoomed to a band the chosen plan has no segment table for.
+                    Text(s.segmentsOnlyRegion1).font(.caption).foregroundStyle(.secondary)
+                }
                 if model.bandPlan != nil {
                     VStack(alignment: .leading, spacing: 4) {
                         if !model.bandSummaries.isEmpty {
@@ -398,7 +404,8 @@ struct ContentView: View {
                 cursorFrequency: cursorFrequency,
                 strings: s,
                 frequencyWindow: model.frequencyWindow,
-                bandPlan: model.bandPlan
+                bandPlan: model.bandPlan,
+                segmentedBand: model.segmentedBand
             )
             .chartCursor(frequency: $cursorFrequency)
         case .impedance:
@@ -407,7 +414,8 @@ struct ContentView: View {
                 cursorFrequency: cursorFrequency,
                 strings: s,
                 frequencyWindow: model.frequencyWindow,
-                bandPlan: model.bandPlan
+                bandPlan: model.bandPlan,
+                segmentedBand: model.segmentedBand
             )
                 .chartCursor(frequency: $cursorFrequency)
         case .tdr:
@@ -439,7 +447,7 @@ struct ContentView: View {
         return HStack(spacing: 24) {
             readout(s.cursor, String(format: "%.4f MHz", point.frequency.megahertz))
             if model.bandPlan != nil {
-                readout(s.bandOfCursor, model.band(at: point.frequency.megahertz)?.name ?? s.outOfBand)
+                readout(s.bandOfCursor, bandText(at: point.frequency))
             }
             readout(s.swr, gamma.swr.map { String(format: "%.3f", $0) } ?? "—")
             readout("R", String(format: "%.2f Ω", point.impedance.resistance))
@@ -585,6 +593,39 @@ struct ContentView: View {
                 .foregroundStyle(model.zoomedBand == summary.band ? .primary : .tertiary)
         }
         .contentShape(.rect)
+    }
+
+    /// The band under the cursor, and which part of it: "20 m · fonia".
+    private func bandText(at frequency: Frequency) -> String {
+        guard let band = model.band(at: frequency.megahertz) else { return s.outOfBand }
+        guard let segment = band.segment(at: frequency) else { return band.name }
+        return "\(band.name) · \(s.mode(segment.mode))"
+    }
+
+    /// What the coloured strip under the trace means.
+    ///
+    /// Only the kinds actually present in this band: a legend listing beacons and
+    /// satellite for 40 m would be explaining something that is not on the screen.
+    private func segmentLegend(_ band: AmateurBand) -> some View {
+        var kinds: [BandSegment.Mode] = []
+        for segment in band.segments where !kinds.contains(segment.mode) {
+            kinds.append(segment.mode)
+        }
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 10) {
+                ForEach(kinds, id: \.self) { mode in
+                    HStack(spacing: 4) {
+                        RoundedRectangle(cornerRadius: 1)
+                            .fill(BandSegmentStrip.colour(mode).opacity(0.55))
+                            .frame(width: 12, height: 8)
+                        Text(s.mode(mode))
+                    }
+                }
+            }
+            Text(s.segmentsNote)
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
     }
 
     /// The band's best SWR and where it falls.

@@ -19,8 +19,8 @@ struct BandOverlayTests {
 
         for (earlier, later) in zip(placements, placements.dropFirst()) {
             let gap = later.x - earlier.x
-            let needed = (Self.labelWidth(earlier.band.name) + Self.labelWidth(later.band.name)) / 2
-            #expect(gap >= needed, "\(earlier.band.name) and \(later.band.name) overlap")
+            let needed = (Self.labelWidth(earlier.text) + Self.labelWidth(later.text)) / 2
+            #expect(gap >= needed, "\(earlier.text) and \(later.text) overlap")
         }
         #expect(!placements.isEmpty)
         // And what does get drawn is in frequency order, left to right.
@@ -35,7 +35,7 @@ struct BandOverlayTests {
         #expect(bands.map(\.name) == ["12 m", "10 m"])
 
         let placements = BandLabelLayout.placements(for: bands, span: 24.8...29.8, width: 40)
-        #expect(placements.map(\.band.name) == ["10 m"])
+        #expect(placements.map(\.text) == ["10 m"])
     }
 
     @Test("A band at the edge of the sweep is nudged inside, not dropped")
@@ -46,7 +46,7 @@ struct BandOverlayTests {
         let placements = BandLabelLayout.placements(for: bands, span: 14.2...14.3, width: 400)
 
         let twenty = try #require(placements.first)
-        #expect(twenty.band.name == "20 m")
+        #expect(twenty.text == "20 m")
         #expect(twenty.x >= Self.labelWidth("20 m") / 2)
         #expect(twenty.x <= 400 - Self.labelWidth("20 m") / 2)
     }
@@ -65,6 +65,32 @@ struct BandOverlayTests {
         let untouched = BandLabelLayout.drawnRange(for: ten, in: span)
         #expect(untouched.lowerBound == ten.range.lowerBound.megahertz)
         #expect(untouched.upperBound == ten.range.upperBound.megahertz)
+    }
+
+    @Test("A dashed rule at every division, and none on the frame")
+    func dividersFallOnTheDivisions() throws {
+        let sixMetres = try #require(BandPlan.italy.band(at: .megahertz(51)))
+        #expect(sixMetres.segments.map(\.mode) == [.cw, .phone, .digital, .beacon, .phone])
+
+        // The zoom window is the band plus a small margin either side, so the band's own
+        // edges are inside the chart and get a rule like any other division.
+        let zoomed = BandLabelLayout.dividers(for: sixMetres, in: 49.9...52.1)
+        #expect(zoomed == [50.0, 50.1, 50.3, 50.4, 50.5, 52.0])
+
+        // Adjacent segments share an edge: one rule, not two.
+        #expect(Set(zoomed).count == zoomed.count)
+
+        // A window that starts exactly on the band leaves the edge to the frame.
+        let flush = BandLabelLayout.dividers(for: sixMetres, in: 50.0...52.0)
+        #expect(flush == [50.1, 50.3, 50.4, 50.5])
+    }
+
+    @Test("Only the divisions actually on screen are drawn")
+    func dividersAreClippedToTheWindow() throws {
+        let twenty = try #require(BandPlan.italy.band(at: .megahertz(14.2)))
+        // The digital/beacon/phone divisions at 14.099 and 14.101, and nothing from the
+        // CW end of the band.
+        #expect(BandLabelLayout.dividers(for: twenty, in: 14.09...14.15) == [14.099, 14.101])
     }
 
     @Test("Nothing is placed on a chart with no width")

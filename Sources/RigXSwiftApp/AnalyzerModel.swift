@@ -384,6 +384,25 @@ final class AnalyzerModel {
         return Swift.max(0, low - margin)...(high + margin)
     }
 
+    /// The band whose mode segments are worth drawing.
+    ///
+    /// They are a few kilohertz wide and mean nothing on a chart of a spectrum: the whole
+    /// of 30 m's split between telegraphy and digimodes is 50 kHz, which over a sweep to
+    /// 170 MHz is a third of a pixel. So they appear when the chart is showing one band —
+    /// because it was zoomed to it, or because the sweep itself was that narrow.
+    var segmentedBand: AmateurBand? {
+        if let zoomedBand, zoomRange != nil { return zoomedBand }
+        guard let bandPlan, let window = frequencyWindow else { return nil }
+        let overlapping = bandPlan.bands(
+            overlapping: .megahertz(window.lowerBound)...(.megahertz(window.upperBound))
+        )
+        guard overlapping.count == 1, let band = overlapping.first else { return nil }
+        // Three times the band's own width: enough slack for a sweep taken with a margin
+        // either side, not enough for one that happens to cross a single band on its way
+        // somewhere else.
+        return window.upperBound - window.lowerBound <= band.width.megahertz * 3 ? band : nil
+    }
+
     /// Clicking the band already zoomed to zooms back out.
     func toggleZoom(to band: AmateurBand) {
         zoomedBand = zoomedBand == band ? nil : band

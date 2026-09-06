@@ -186,6 +186,25 @@ struct Strings {
         pick("Il TDR usa comunque tutta la banda misurata: la risoluzione dipende da quella.",
              "TDR still uses the whole measured band: its resolution depends on it.")
     }
+    /// The kinds of operating a band is divided into.
+    func mode(_ mode: BandSegment.Mode) -> String {
+        switch mode {
+        case .cw: pick("CW", "CW")
+        case .digital: pick("digitali", "digital")
+        case .phone: pick("fonia", "phone")
+        case .beacon: pick("beacon", "beacons")
+        case .satellite: pick("satellite", "satellite")
+        }
+    }
+    var segments: String { pick("Segmenti", "Segments") }
+    var segmentsNote: String {
+        pick("Segmenti principali del piano IARU Regione 1, semplificati: il piano completo distingue anche larghezze e stazioni automatiche.",
+             "The main segments of the IARU Region 1 plan, simplified: the full plan also distinguishes bandwidths and automatic stations.")
+    }
+    var segmentsOnlyRegion1: String {
+        pick("I segmenti di modo sono tabulati solo per i piani della Regione 1.",
+             "Mode segments are tabulated only for the Region 1 plans.")
+    }
     var bandOfCursor: String { pick("Banda", "Band") }
     var outOfBand: String { pick("fuori banda", "out of band") }
 

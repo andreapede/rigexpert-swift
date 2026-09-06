@@ -1,5 +1,36 @@
 import Foundation
 
+/// A stretch of a band given over to one kind of operating.
+///
+/// A simplification of the plan, and deliberately so. The IARU tables carry a maximum
+/// bandwidth, an automatic-station flag and a dozen centres of activity per band; what
+/// an antenna measurement needs is the coarse answer — is the dip where the voice is, or
+/// where the digital modes are.
+public struct BandSegment: Sendable, Hashable, Identifiable {
+    public enum Mode: String, Sendable, Hashable, CaseIterable, Codable {
+        /// Telegraphy.
+        case cw
+        /// The plan's "narrow band modes", plus the all-mode stretches its notes hand to
+        /// digimodes — 1840–1843 on 160 m is where FT8 actually lives.
+        case digital
+        /// The plan's "all modes": SSB, AM and FM, which is where voice happens.
+        case phone
+        case beacon
+        case satellite
+    }
+
+    public var mode: Mode
+    public var range: ClosedRange<Frequency>
+
+    public init(mode: Mode, range: ClosedRange<Frequency>) {
+        self.mode = mode
+        self.range = range
+    }
+
+    public var id: String { "\(mode.rawValue)@\(range.lowerBound.hertz)" }
+    public var width: Frequency { .hertz(range.upperBound.hertz - range.lowerBound.hertz) }
+}
+
 /// One amateur allocation, as a band plan draws it.
 ///
 /// The overall edges only — the segments inside a band (CW, digital, phone, the beacon
@@ -15,11 +46,20 @@ public struct AmateurBand: Sendable, Hashable, Identifiable {
     /// experimental authorisation that has to be renewed. Drawn fainter, because an
     /// antenna that covers it may still not be one you are allowed to transmit into.
     public var isConditional: Bool
+    /// What the band is divided into, in frequency order and without overlaps. Empty
+    /// where this project has no table for the plan — see `BandPlan`.
+    public var segments: [BandSegment]
 
-    public init(name: String, range: ClosedRange<Frequency>, isConditional: Bool = false) {
+    public init(
+        name: String,
+        range: ClosedRange<Frequency>,
+        isConditional: Bool = false,
+        segments: [BandSegment] = []
+    ) {
         self.name = name
         self.range = range
         self.isConditional = isConditional
+        self.segments = segments
     }
 
     /// The range, not the name: 70 cm is two separate allocations in Italy, and both are
@@ -30,6 +70,17 @@ public struct AmateurBand: Sendable, Hashable, Identifiable {
     public var centre: Frequency { .hertz((range.lowerBound.hertz + range.upperBound.hertz) / 2) }
 
     public func contains(_ frequency: Frequency) -> Bool { range.contains(frequency) }
+
+    /// Which kind of operating a frequency falls under. Nil in the gaps the plan leaves
+    /// between segments, and everywhere in a plan with no segment table.
+    public func segment(at frequency: Frequency) -> BandSegment? {
+        segments.first { $0.range.contains(frequency) }
+    }
+}
+
+extension ClosedRange where Bound == Frequency {
+    /// The same range in megahertz, for the plotting layer.
+    public var megahertz: ClosedRange<Double> { lowerBound.megahertz...upperBound.megahertz }
 }
 
 /// Where the bands are, according to whom.
@@ -96,28 +147,109 @@ public enum BandPlan: String, Sendable, Hashable, CaseIterable, Codable, Identif
         )
     }
 
+    /// The mode segments of the IARU Region 1 plans, by band name.
+    ///
+    /// Read from the two official tables, September 2026:
+    ///   - IARU Region 1 HF Band Plan, effective 16 OCT 2020
+    ///     iaru-r1.org/wp-content/uploads/2021/06/hf_r1_bandplan.pdf
+    ///   - IARU Region 1 VHF Band Plan, effective December 2020
+    ///     iaru-r1.org/wp-content/uploads/2020/12/VHF-Bandplan.pdf
+    ///
+    /// Reduced to four kinds of operating from the tables' own wording: "CW" is `cw`;
+    /// "Narrow band modes" is `digital`, as are the all-mode stretches whose usage column
+    /// says Digimodes; "All modes" is `phone`; the International Beacon Project and the
+    /// coordinated beacon segments are `beacon`. Adjacent stretches of the same kind are
+    /// merged — the plan's distinction between attended and automatic digital stations is
+    /// real, and invisible on a chart of an antenna.
+    ///
+    /// Italy uses the same table: its bands are narrower, and the segments are clipped to
+    /// them, which is exactly what the national plan does — 160 m in Italy is the CW,
+    /// digimode and phone thirds of 1830–1850 and nothing above it.
+    private typealias Span = (BandSegment.Mode, Double, Double)
+    private static let region1Segments: [String: [Span]] = [
+        "2200 m": [(.cw, 135.7, 137.8)],
+        "630 m": [(.cw, 472, 475), (.digital, 475, 479)],
+        "160 m": [(.cw, 1810, 1838), (.digital, 1838, 1843), (.phone, 1843, 2000)],
+        "80 m": [(.cw, 3500, 3570), (.digital, 3570, 3600), (.phone, 3600, 3800)],
+        // 5366.0–5366.5 is the plan's 20 Hz weak-signal slot: WSPR, in practice.
+        "60 m": [(.cw, 5351.5, 5354), (.phone, 5354, 5366), (.digital, 5366, 5366.5)],
+        "40 m": [(.cw, 7000, 7040), (.digital, 7040, 7060), (.phone, 7060, 7200)],
+        "30 m": [(.cw, 10_100, 10_130), (.digital, 10_130, 10_150)],
+        "20 m": [
+            (.cw, 14_000, 14_070), (.digital, 14_070, 14_099),
+            (.beacon, 14_099, 14_101), (.phone, 14_101, 14_350),
+        ],
+        "17 m": [
+            (.cw, 18_068, 18_095), (.digital, 18_095, 18_109),
+            (.beacon, 18_109, 18_111), (.phone, 18_111, 18_168),
+        ],
+        "15 m": [
+            (.cw, 21_000, 21_070), (.digital, 21_070, 21_149),
+            (.beacon, 21_149, 21_151), (.phone, 21_151, 21_450),
+        ],
+        "12 m": [
+            (.cw, 24_890, 24_915), (.digital, 24_915, 24_929),
+            (.beacon, 24_929, 24_931), (.phone, 24_931, 24_990),
+        ],
+        "10 m": [
+            (.cw, 28_000, 28_070), (.digital, 28_070, 28_190),
+            (.beacon, 28_190, 28_225), (.phone, 28_225, 29_200),
+            (.digital, 29_200, 29_300), (.satellite, 29_300, 29_510),
+            (.phone, 29_510, 29_700),
+        ],
+        "6 m": [
+            (.cw, 50_000, 50_100), (.phone, 50_100, 50_300),
+            (.digital, 50_300, 50_400), (.beacon, 50_400, 50_500),
+            (.phone, 50_500, 52_000),
+        ],
+        // The whole of Italy's 4 m falls in the plan's narrow-band and FM stretches, so
+        // it comes out as one block. That is the band: 200 kHz, and no room to divide.
+        "4 m": [(.beacon, 70_000, 70_100), (.phone, 70_100, 70_500)],
+        "2 m": [
+            (.cw, 144_000, 144_150), (.phone, 144_150, 144_400),
+            (.beacon, 144_400, 144_493), (.phone, 144_500, 144_794),
+            (.digital, 144_794, 144_962.5), (.phone, 144_975, 145_794),
+            (.satellite, 145_794, 146_000),
+        ],
+    ]
+
+    /// A Region 1 band, with the plan's segments clipped to whatever the band's own edges
+    /// are — which is how the Italian bands get their segments for free.
+    private static func r1Band(
+        _ name: String, _ lowKilohertz: Double, _ highKilohertz: Double, conditional: Bool = false
+    ) -> AmateurBand {
+        let range = Frequency.kilohertz(lowKilohertz)...Frequency.kilohertz(highKilohertz)
+        let segments = (region1Segments[name] ?? []).compactMap { span -> BandSegment? in
+            let low = Swift.max(span.1, lowKilohertz)
+            let high = Swift.min(span.2, highKilohertz)
+            guard high > low else { return nil }
+            return BandSegment(mode: span.0, range: .kilohertz(low)...(.kilohertz(high)))
+        }
+        return AmateurBand(name: name, range: range, isConditional: conditional, segments: segments)
+    }
+
     /// IARU Region 1: Europe, Africa, the Middle East and northern Asia.
     ///
     /// 160 m is drawn to 2000 kHz because the plan runs that far, and marked conditional
     /// because almost nowhere in the region may an operator use all of it — Italy stops
     /// at 1850.
     private static let region1Bands: [AmateurBand] = [
-        band("2200 m", 135.7, 137.8, conditional: true),
-        band("630 m", 472, 479, conditional: true),
-        band("160 m", 1810, 2000, conditional: true),
-        band("80 m", 3500, 3800),
-        band("60 m", 5351.5, 5366.5, conditional: true),
-        band("40 m", 7000, 7200),
-        band("30 m", 10_100, 10_150),
-        band("20 m", 14_000, 14_350),
-        band("17 m", 18_068, 18_168),
-        band("15 m", 21_000, 21_450),
-        band("12 m", 24_890, 24_990),
-        band("10 m", 28_000, 29_700),
-        band("6 m", 50_000, 52_000),
-        band("4 m", 70_000, 70_500, conditional: true),
-        band("2 m", 144_000, 146_000),
-        band("70 cm", 430_000, 440_000, conditional: true),
+        r1Band("2200 m", 135.7, 137.8, conditional: true),
+        r1Band("630 m", 472, 479, conditional: true),
+        r1Band("160 m", 1810, 2000, conditional: true),
+        r1Band("80 m", 3500, 3800),
+        r1Band("60 m", 5351.5, 5366.5, conditional: true),
+        r1Band("40 m", 7000, 7200),
+        r1Band("30 m", 10_100, 10_150),
+        r1Band("20 m", 14_000, 14_350),
+        r1Band("17 m", 18_068, 18_168),
+        r1Band("15 m", 21_000, 21_450),
+        r1Band("12 m", 24_890, 24_990),
+        r1Band("10 m", 28_000, 29_700),
+        r1Band("6 m", 50_000, 52_000),
+        r1Band("4 m", 70_000, 70_500, conditional: true),
+        r1Band("2 m", 144_000, 146_000),
+        r1Band("70 cm", 430_000, 440_000, conditional: true),
     ]
 
     /// Italy, as the PNRF allocates it.
@@ -126,26 +258,30 @@ public enum BandPlan: String, Sendable, Hashable, CaseIterable, Codable, Identif
     /// experimental authorisation. 4 m is 70.100–70.300, likewise experimental, which is
     /// why it is drawn as a conditional band and not as the region's 70.0–70.5.
     private static let italyBands: [AmateurBand] = [
-        band("2200 m", 135.7, 137.8, conditional: true),
-        band("630 m", 472, 479, conditional: true),
-        band("160 m", 1830, 1850),
-        band("80 m", 3500, 3800),
-        band("60 m", 5351.5, 5366.5, conditional: true),
-        band("40 m", 7000, 7200),
-        band("30 m", 10_100, 10_150),
-        band("20 m", 14_000, 14_350),
-        band("17 m", 18_068, 18_168),
-        band("15 m", 21_000, 21_450),
-        band("12 m", 24_890, 24_990),
-        band("10 m", 28_000, 29_700),
-        band("6 m", 50_000, 52_000),
-        band("4 m", 70_100, 70_300, conditional: true),
-        band("2 m", 144_000, 146_000),
-        band("70 cm", 430_000, 434_000, conditional: true),
-        band("70 cm", 435_000, 438_000, conditional: true),
+        r1Band("2200 m", 135.7, 137.8, conditional: true),
+        r1Band("630 m", 472, 479, conditional: true),
+        r1Band("160 m", 1830, 1850),
+        r1Band("80 m", 3500, 3800),
+        r1Band("60 m", 5351.5, 5366.5, conditional: true),
+        r1Band("40 m", 7000, 7200),
+        r1Band("30 m", 10_100, 10_150),
+        r1Band("20 m", 14_000, 14_350),
+        r1Band("17 m", 18_068, 18_168),
+        r1Band("15 m", 21_000, 21_450),
+        r1Band("12 m", 24_890, 24_990),
+        r1Band("10 m", 28_000, 29_700),
+        r1Band("6 m", 50_000, 52_000),
+        r1Band("4 m", 70_100, 70_300, conditional: true),
+        r1Band("2 m", 144_000, 146_000),
+        r1Band("70 cm", 430_000, 434_000, conditional: true),
+        r1Band("70 cm", 435_000, 438_000, conditional: true),
     ]
 
     /// IARU Region 2: the Americas. The widest allocations of the three.
+    ///
+    /// Without mode segments: Regions 2 and 3 publish their own plans, and copying
+    /// Region 1's onto them would be inventing a rule rather than reporting one. The
+    /// interface says so rather than showing an empty strip.
     ///
     /// 60 m is five 2.8 kHz channels rather than a band; it is drawn as the span they
     /// occupy, which is why it is conditional. Shading five slivers on an HF-wide chart
@@ -169,7 +305,8 @@ public enum BandPlan: String, Sendable, Hashable, CaseIterable, Codable, Identif
         band("70 cm", 420_000, 450_000, conditional: true),
     ]
 
-    /// IARU Region 3: Asia-Pacific and Oceania.
+    /// IARU Region 3: Asia-Pacific and Oceania. No mode segments, for the reason given
+    /// above Region 2.
     private static let region3Bands: [AmateurBand] = [
         band("2200 m", 135.7, 137.8, conditional: true),
         band("630 m", 472, 479, conditional: true),

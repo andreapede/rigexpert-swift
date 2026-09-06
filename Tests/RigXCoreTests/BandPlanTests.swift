@@ -132,3 +132,84 @@ struct BandPlanTests {
         #expect(try #require(twenty.worstSWR).isFinite)
     }
 }
+
+@Suite("Mode segments")
+struct BandSegmentTests {
+    /// The plans whose segments this project tabulates. Regions 2 and 3 publish their own
+    /// and are deliberately left empty.
+    static let segmentedPlans: [BandPlan] = [.italy, .iaruRegion1]
+
+    @Test("Segments are ordered, disjoint, and inside their band", arguments: segmentedPlans)
+    func segmentsAreWellFormed(plan: BandPlan) {
+        for band in plan.bands {
+            for segment in band.segments {
+                #expect(segment.range.lowerBound < segment.range.upperBound)
+                #expect(
+                    band.range.lowerBound <= segment.range.lowerBound
+                        && segment.range.upperBound <= band.range.upperBound,
+                    "\(plan) \(band.name): \(segment.mode) escapes the band"
+                )
+            }
+            for (earlier, later) in zip(band.segments, band.segments.dropFirst()) {
+                // `segment(at:)` returns the first match, so an overlap would make the
+                // answer depend on the order of the table.
+                #expect(
+                    earlier.range.upperBound <= later.range.lowerBound,
+                    "\(plan) \(band.name): \(earlier.mode) runs into \(later.mode)"
+                )
+            }
+        }
+    }
+
+    @Test("Every HF band an antenna is cut for is divided up")
+    func hfBandsHaveSegments() throws {
+        for name in ["160 m", "80 m", "40 m", "30 m", "20 m", "17 m", "15 m", "12 m", "10 m"] {
+            let band = try #require(BandPlan.italy.bands.first { $0.name == name })
+            #expect(!band.segments.isEmpty, "\(name) has no segments")
+        }
+    }
+
+    @Test("The well known frequencies land where they should")
+    func knownFrequencies() throws {
+        let twenty = try #require(BandPlan.italy.band(at: .megahertz(14.2)))
+        #expect(twenty.segment(at: .megahertz(14.020))?.mode == .cw)
+        // FT8 and its neighbours.
+        #expect(twenty.segment(at: .megahertz(14.074))?.mode == .digital)
+        #expect(twenty.segment(at: .megahertz(14.100))?.mode == .beacon)
+        #expect(twenty.segment(at: .megahertz(14.200))?.mode == .phone)
+
+        let forty = try #require(BandPlan.italy.band(at: .megahertz(7.1)))
+        #expect(forty.segment(at: .megahertz(7.030))?.mode == .cw)
+        #expect(forty.segment(at: .megahertz(7.045))?.mode == .digital)
+        #expect(forty.segment(at: .megahertz(7.100))?.mode == .phone)
+
+        // 160 m: the plan hands 1840–1843 to digimodes even though it is an all-mode
+        // segment, which is where FT8 actually sits.
+        let onesixty = try #require(BandPlan.iaruRegion1.band(at: .megahertz(1.84)))
+        #expect(onesixty.segment(at: .megahertz(1.840))?.mode == .digital)
+        #expect(onesixty.segment(at: .megahertz(1.850))?.mode == .phone)
+    }
+
+    @Test("Italy gets the region's segments, cut to Italy's band")
+    func italianSegmentsAreClipped() throws {
+        let italy = try #require(BandPlan.italy.band(at: .kilohertz(1840)))
+        let region1 = try #require(BandPlan.iaruRegion1.band(at: .kilohertz(1840)))
+
+        #expect(italy.segments.map(\.mode) == [.cw, .digital, .phone])
+        #expect(italy.segments.map(\.mode) == region1.segments.map(\.mode))
+        // Same kinds, but the Italian phone segment stops where the Italian band does.
+        let italianPhone = try #require(italy.segments.last)
+        let regionPhone = try #require(region1.segments.last)
+        #expect(italianPhone.range.upperBound == .kilohertz(1850))
+        #expect(regionPhone.range.upperBound == .kilohertz(2000))
+        // And the CW segment starts at the Italian edge, not at the region's 1810.
+        let italianCW = try #require(italy.segments.first)
+        #expect(italianCW.range.lowerBound == .kilohertz(1830))
+    }
+
+    @Test("Regions 2 and 3 carry no segments rather than Region 1's", arguments: [BandPlan.iaruRegion2, .iaruRegion3])
+    func otherRegionsHaveNone(plan: BandPlan) {
+        #expect(plan.bands.allSatisfy { $0.segments.isEmpty })
+        #expect(plan.band(at: .megahertz(14.074))?.segment(at: .megahertz(14.074)) == nil)
+    }
+}

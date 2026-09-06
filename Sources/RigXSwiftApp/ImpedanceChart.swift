@@ -15,6 +15,9 @@ struct ImpedanceChart: View {
     var frequencyWindow: ClosedRange<Double>?
     /// Which amateur bands to shade behind the trace. Nil draws none.
     var bandPlan: BandPlan?
+    /// The band whose mode segments are drawn along the foot of the plot, when the chart
+    /// is showing one band closely enough for them to mean anything.
+    var segmentedBand: AmateurBand?
 
     private struct Sample: Identifiable {
         let id: Int
@@ -42,6 +45,7 @@ struct ImpedanceChart: View {
 
         Chart {
             BandShading(bands: bands, span: span)
+            BandSegmentDividers(band: segmentedBand, span: span)
 
             RuleMark(y: .value("zero", 0))
                 .foregroundStyle(.secondary.opacity(0.4))
@@ -74,6 +78,7 @@ struct ImpedanceChart: View {
         .chartYScale(domain: -limit...limit)
         .chartXScale(domain: span)
         .bandNames(bands, span: span)
+        .bandSegments(segmentedBand, span: span, strings: strings)
         .chartXAxisLabel("MHz")
         .chartYAxisLabel("Ω")
         .chartLegend(position: .top, alignment: .leading)

@@ -24,6 +24,8 @@ Everything below was measured with a real AA-30.ZERO against physical references
   and measures the feedline instead of misreporting it as a resonance
 - Shades the amateur bands over the SWR and R/X plots, and reports the best SWR in each
   one — Italy, IARU Region 1, 2 or 3, since the bands are not the same width everywhere
+- Zooms to a band with one click, and shows where the CW, digital and phone segments of
+  it are, with a dashed rule at every division
 - Counts the samples the analyzer failed to measure, rather than hiding them
 - Opens saved Touchstone `.s1p` files and overlays them for comparison, from this or any
   other instrument
