@@ -168,7 +168,10 @@ enum BandLabelLayout {
             // Nominal, not measured: laying out text to place a 4-character label would
             // cost a text run per item per redraw, and the estimate only has to be close
             // enough to keep two names apart.
-            let labelWidth = Double(candidate.item.text.count) * 5.5 + 6
+            // The 12 is clearance, not glyphs: with 6 the beacon slot's name came out
+            // touching the digital segment's next to it on 20 m, which is two kilohertz
+            // of band and a whole word of label.
+            let labelWidth = Double(candidate.item.text.count) * 5.5 + 12
             guard labelWidth <= width else { continue }
 
             let centre = (candidate.visible.lowerBound + candidate.visible.upperBound) / 2

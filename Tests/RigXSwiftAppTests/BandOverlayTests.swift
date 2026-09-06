@@ -7,7 +7,7 @@ import Testing
 struct BandOverlayTests {
     /// The estimate the layout itself uses, so a test asserting "these do not overlap"
     /// is asking about the same rectangles the chart draws.
-    static func labelWidth(_ name: String) -> Double { Double(name.count) * 5.5 + 6 }
+    static func labelWidth(_ name: String) -> Double { Double(name.count) * 5.5 + 12 }
 
     @Test("No two names are drawn on top of each other")
     func namesDoNotCollide() {
