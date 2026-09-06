@@ -1,3 +1,4 @@
+import RigXCore
 import Foundation
 import SwiftUI
 
@@ -136,6 +137,57 @@ struct Strings {
     var frequency: String { pick("Frequenza", "Frequency") }
     var chart: String { pick("Grafico", "Chart") }
     var uiLanguage: String { pick("Lingua", "Language") }
+
+    // Bands
+    var bands: String { pick("Bande", "Bands") }
+    var bandPlan: String { pick("Piano", "Plan") }
+    var noBandPlan: String { pick("Nessuno", "None") }
+    /// The plan names. Mostly proper nouns, but "Italia" is not "Italy".
+    func bandPlanName(_ plan: BandPlan) -> String {
+        switch plan {
+        case .italy: pick("Italia", "Italy")
+        case .iaruRegion1: pick("IARU Regione 1", "IARU Region 1")
+        case .iaruRegion2: pick("IARU Regione 2", "IARU Region 2")
+        case .iaruRegion3: pick("IARU Regione 3", "IARU Region 3")
+        }
+    }
+    /// Said once, under the list, because the overlay is a convenience and not a licence.
+    var bandPlanNote: String {
+        pick("Le bande sono sovrapposte ai grafici SWR e R/X. Il piano è un promemoria, non un permesso: la tua licenza può essere più stretta.",
+             "The bands are shaded on the SWR and R/X charts. The plan is a reminder, not a permission: your own licence may be narrower.")
+    }
+    var bandConditional: String {
+        pick("Banda condizionata: condivisa, a potenza limitata o soggetta ad autorizzazione nazionale.",
+             "Conditional band: shared, power limited, or subject to a national authorisation.")
+    }
+    func bandCoverage(percent: Int, samples: Int) -> String {
+        pick("Misurata al \(percent)% · \(samples) campioni", "\(percent)% measured · \(samples) samples")
+    }
+    var bandNoSamples: String {
+        pick("Nessun campione è caduto in questa banda: aumenta i punti dello sweep.",
+             "No sample landed inside this band: raise the sweep's point count.")
+    }
+    func bandWorstSWR(_ swr: Double) -> String {
+        pick(String(format: "SWR peggiore in banda %.2f", swr),
+             String(format: "worst SWR in band %.2f", swr))
+    }
+    func bandFaults(_ count: Int) -> String {
+        pick("\(count) campioni non misurati in banda", "\(count) samples in band could not be measured")
+    }
+    var clickBandToZoom: String {
+        pick("Clicca una banda per ingrandire i grafici su quell'intervallo.",
+             "Click a band to zoom the charts to it.")
+    }
+    func zoomedTo(_ name: String) -> String {
+        pick("Zoom su \(name) — clicca di nuovo per tornare all'intera misura.",
+             "Zoomed to \(name) — click it again for the whole measurement.")
+    }
+    var tdrIgnoresZoom: String {
+        pick("Il TDR usa comunque tutta la banda misurata: la risoluzione dipende da quella.",
+             "TDR still uses the whole measured band: its resolution depends on it.")
+    }
+    var bandOfCursor: String { pick("Banda", "Band") }
+    var outOfBand: String { pick("fuori banda", "out of band") }
 
     // TDR
     var tdr: String { pick("TDR", "TDR") }

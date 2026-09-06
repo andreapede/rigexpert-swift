@@ -13,6 +13,8 @@ struct ImpedanceChart: View {
     var strings: Strings
     /// The window shared by every chart, when more than one trace is on screen.
     var frequencyWindow: ClosedRange<Double>?
+    /// Which amateur bands to shade behind the trace. Nil draws none.
+    var bandPlan: BandPlan?
 
     private struct Sample: Identifiable {
         let id: Int
@@ -35,7 +37,12 @@ struct ImpedanceChart: View {
             ]
         }
 
+        let span = frequencyWindow ?? Self.span(points)
+        let bands = bandPlan?.bands(overlapping: .megahertz(span.lowerBound)...(.megahertz(span.upperBound))) ?? []
+
         Chart {
+            BandShading(bands: bands, span: span)
+
             RuleMark(y: .value("zero", 0))
                 .foregroundStyle(.secondary.opacity(0.4))
                 .lineStyle(StrokeStyle(lineWidth: 1))
@@ -52,6 +59,9 @@ struct ImpedanceChart: View {
                 )
                 .foregroundStyle(by: .value("Serie", sample.series))
                 .interpolationMethod(.monotone)
+                // Sparse data — a band zoom over a coarse grid — draws no line at all.
+                .symbol(.circle)
+                .symbolSize(samples.count <= 80 ? 26 : 0)
             }
 
             if let cursorFrequency {
@@ -62,7 +72,8 @@ struct ImpedanceChart: View {
         }
         .chartForegroundStyleScale(["R": Color.accentColor, "X": Color.purple])
         .chartYScale(domain: -limit...limit)
-        .chartXScale(domain: frequencyWindow ?? Self.span(points))
+        .chartXScale(domain: span)
+        .bandNames(bands, span: span)
         .chartXAxisLabel("MHz")
         .chartYAxisLabel("Ω")
         .chartLegend(position: .top, alignment: .leading)

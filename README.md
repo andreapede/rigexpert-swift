@@ -22,6 +22,8 @@ Everything below was measured with a real AA-30.ZERO against physical references
 - Measures a coaxial cable's length, velocity factor and loss from the sweep alone
 - Detects when the reactance crossings belong to the feedline rather than the antenna,
   and measures the feedline instead of misreporting it as a resonance
+- Shades the amateur bands over the SWR and R/X plots, and reports the best SWR in each
+  one — Italy, IARU Region 1, 2 or 3, since the bands are not the same width everywhere
 - Counts the samples the analyzer failed to measure, rather than hiding them
 - Opens saved Touchstone `.s1p` files and overlays them for comparison, from this or any
   other instrument
@@ -71,7 +73,7 @@ it needs no `sudo`.
 
 | module | contents |
 |---|---|
-| `RigXCore` | `Frequency`, `Impedance`, `Reflection`, `Sweep`, `DeviceProfile`, `Calibration`, cable and sweep analysis |
+| `RigXCore` | `Frequency`, `Impedance`, `Reflection`, `Sweep`, `DeviceProfile`, `Calibration`, `BandPlan`, cable and sweep analysis |
 | `RigXIO` | Touchstone `.s1p` |
 | `RigXTransport` | the AA protocol, `AnalyzerSession`, `SerialChannel`, and a simulated analyzer |
 | `RigXSwiftApp` | the SwiftUI app |

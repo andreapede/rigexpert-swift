@@ -198,6 +198,33 @@ struct ContentView: View {
                 .disabled(!model.connection.isConnected || model.isSweeping)
             }
 
+            Section(s.bands) {
+                Picker(s.bandPlan, selection: $model.bandPlan) {
+                    Text(s.noBandPlan).tag(BandPlan?.none)
+                    ForEach(BandPlan.allCases) { plan in
+                        Text(s.bandPlanName(plan)).tag(Optional(plan))
+                    }
+                }
+                ForEach(model.bandSummaries) { summary in
+                    bandRow(summary)
+                }
+                if let zoomed = model.zoomedBand, model.zoomRange != nil {
+                    Label(s.zoomedTo(zoomed.name), systemImage: "arrow.up.left.and.arrow.down.right")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if model.bandPlan != nil {
+                    VStack(alignment: .leading, spacing: 4) {
+                        if !model.bandSummaries.isEmpty {
+                            Text(s.clickBandToZoom)
+                        }
+                        Text(s.bandPlanNote)
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+
             if chartKind == .tdr {
                 Section {
                     Picker(selection: $model.tdrWindow) {
@@ -217,6 +244,13 @@ struct ContentView: View {
                     Text(s.tdrBandwidthNote)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    // The one view that does not follow the band zoom, said out loud
+                    // rather than left for the reader to notice.
+                    if model.zoomRange != nil {
+                        Text(s.tdrIgnoresZoom)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 } header: {
                     Text("\(s.tdr) \(s.experimental)")
                 }
@@ -356,28 +390,33 @@ struct ContentView: View {
             SWRChart(
                 others: model.visibleTraces
                     .filter { !$0.isSelected }
-                    .map { (name: $0.name, points: $0.points, colorIndex: $0.colorIndex) },
-                points: model.displayedPoints,
+                    .map { (name: $0.name, points: model.withinWindow($0.points), colorIndex: $0.colorIndex) },
+                points: model.visiblePoints,
                 bestMatch: model.bestMatch,
-                rawPoints: model.showRawTrace && model.activeCalibration != nil ? model.rawPoints : [],
+                rawPoints: model.showRawTrace && model.activeCalibration != nil
+                    ? model.withinWindow(model.rawPoints) : [],
                 cursorFrequency: cursorFrequency,
                 strings: s,
-                frequencyWindow: model.frequencyWindow
+                frequencyWindow: model.frequencyWindow,
+                bandPlan: model.bandPlan
             )
             .chartCursor(frequency: $cursorFrequency)
         case .impedance:
             ImpedanceChart(
-                points: model.displayedPoints,
+                points: model.visiblePoints,
                 cursorFrequency: cursorFrequency,
                 strings: s,
-                frequencyWindow: model.frequencyWindow
+                frequencyWindow: model.frequencyWindow,
+                bandPlan: model.bandPlan
             )
                 .chartCursor(frequency: $cursorFrequency)
         case .tdr:
             TDRChart(response: model.tdr, strings: s)
         case .smith:
+            // Zoomed too: the Smith chart has no frequency axis, and the locus of one
+            // band is the whole reason to look at it.
             SmithChart(
-                points: model.displayedPoints,
+                points: model.visiblePoints,
                 referenceImpedance: model.displayedSweep.referenceImpedance,
                 highlighted: model.bestMatch,
                 cursor: cursorPoint,
@@ -390,7 +429,7 @@ struct ContentView: View {
     /// The measured sample nearest the pointer.
     private var cursorPoint: MeasurementPoint? {
         guard let cursorFrequency else { return nil }
-        return model.displayedPoints.min {
+        return model.visiblePoints.min {
             abs($0.frequency.megahertz - cursorFrequency) < abs($1.frequency.megahertz - cursorFrequency)
         }
     }
@@ -399,6 +438,9 @@ struct ContentView: View {
         let gamma = point.reflection(referenceImpedance: model.displayedSweep.referenceImpedance)
         return HStack(spacing: 24) {
             readout(s.cursor, String(format: "%.4f MHz", point.frequency.megahertz))
+            if model.bandPlan != nil {
+                readout(s.bandOfCursor, model.band(at: point.frequency.megahertz)?.name ?? s.outOfBand)
+            }
             readout(s.swr, gamma.swr.map { String(format: "%.3f", $0) } ?? "—")
             readout("R", String(format: "%.2f Ω", point.impedance.resistance))
             readout("X", String(format: "%.2f Ω", point.impedance.reactance))
@@ -452,7 +494,7 @@ struct ContentView: View {
         // could not measure; including them puts an SWR of several million in a readout
         // meant to say how flat the curve is.
         let z0 = model.displayedSweep.referenceImpedance
-        let values = model.displayedPoints
+        let values = model.visiblePoints
             .map { $0.reflection(referenceImpedance: z0) }
             .filter { $0.magnitude < 0.999 }
             .compactMap(\.swr)
@@ -467,7 +509,7 @@ struct ContentView: View {
     /// the edge of the analyzer's range can drop a handful and still look plausible.
     @ViewBuilder
     private var qualityReadout: some View {
-        let quality = model.displayedSweep.quality
+        let quality = model.visibleSweep.quality
         if quality.isClean {
             readout(s.points, "\(quality.sampleCount)")
         } else {
@@ -498,6 +540,97 @@ struct ContentView: View {
         }
         lines.append(s.lostSamplesExplanation)
         return lines.joined(separator: "\n")
+    }
+
+    /// One band of the plan, as this sweep sees it.
+    ///
+    /// The lowest SWR and where it falls: the two numbers that answer "can I use this
+    /// antenna there". The dot carries the verdict, so the list can be read without
+    /// reading any of the numbers.
+    private func bandRow(_ summary: BandSummary) -> some View {
+        Button {
+            model.toggleZoom(to: summary.band)
+        } label: {
+            bandRowLabel(summary)
+        }
+        // Plain, so the row still reads as a row: the whole list would otherwise turn
+        // into a stack of buttons competing with the one that starts a sweep.
+        .buttonStyle(.plain)
+        .help(bandHelp(summary))
+    }
+
+    private func bandRowLabel(_ summary: BandSummary) -> some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(Self.verdictColour(summary.minimumSWR))
+                .frame(width: 7, height: 7)
+                // Conditional bands are outlined rather than filled: the same SWR, a
+                // different question about whether you may key up.
+                .opacity(summary.band.isConditional ? 0.45 : 1)
+            Text(summary.band.name)
+            if summary.isPartial {
+                Image(systemName: "scissors")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if let figures = Self.bandFigures(summary) {
+                Text(figures).font(.system(.caption, design: .monospaced))
+            } else {
+                Text("—").foregroundStyle(.secondary)
+            }
+            Image(systemName: model.zoomedBand == summary.band
+                  ? "arrow.up.left.and.arrow.down.right" : "magnifyingglass")
+                .font(.caption2)
+                .foregroundStyle(model.zoomedBand == summary.band ? .primary : .tertiary)
+        }
+        .contentShape(.rect)
+    }
+
+    /// The band's best SWR and where it falls.
+    ///
+    /// Capped rather than printed: out of band the SWR runs to six and seven figures,
+    /// and a row reading "3598029.52" pushes the frequency it belongs to off the edge of
+    /// the sidebar. Past a hundred the exact value says nothing the cap does not.
+    private static func bandFigures(_ summary: BandSummary) -> String? {
+        guard let swr = summary.minimumSWR, let frequency = summary.frequencyOfMinimum else {
+            return nil
+        }
+        let value = swr >= 100 ? ">100" : String(format: "%.2f", swr)
+        return String(format: "%@ · %.3f MHz", value, frequency.megahertz)
+    }
+
+    private func bandHelp(_ summary: BandSummary) -> String {
+        var lines: [String] = [
+            String(
+                format: "%@  %.3f – %.3f MHz",
+                summary.band.name,
+                summary.band.range.lowerBound.megahertz,
+                summary.band.range.upperBound.megahertz
+            )
+        ]
+        if summary.sampleCount == 0 {
+            lines.append(s.bandNoSamples)
+        } else {
+            lines.append(s.bandCoverage(
+                percent: Int((summary.coverage * 100).rounded()), samples: summary.sampleCount
+            ))
+            if let worst = summary.worstSWR { lines.append(s.bandWorstSWR(worst)) }
+            if summary.faultCount > 0 { lines.append(s.bandFaults(summary.faultCount)) }
+        }
+        if summary.band.isConditional { lines.append(s.bandConditional) }
+        return lines.joined(separator: "\n")
+    }
+
+    /// Green usable as it stands, yellow usable, orange only with a tuner, grey no.
+    private static func verdictColour(_ swr: Double?) -> Color {
+        switch swr {
+        case .some(...1.5): .green
+        case .some(...2): .yellow
+        case .some(...3): .orange
+        case .some: .red
+        case nil: .secondary
+        }
     }
 
     private func readout(_ label: String, _ value: String) -> some View {

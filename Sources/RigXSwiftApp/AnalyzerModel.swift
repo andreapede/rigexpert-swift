@@ -25,6 +25,24 @@ final class AnalyzerModel {
 
     var strings: Strings { Strings(language: language) }
 
+    /// The band the charts are zoomed to, set by clicking its row. Nil shows everything.
+    ///
+    /// Deliberately not persisted: the plan is a property of the operator, a zoom is a
+    /// property of the measurement in front of them.
+    var zoomedBand: AmateurBand?
+
+    /// Which amateur band plan is drawn behind the traces; nil draws none.
+    ///
+    /// Persisted like the language, and for the same reason: it is a property of the
+    /// operator, not of the measurement, and asking again at every launch would be
+    /// asking a question whose answer never changes.
+    var bandPlan: BandPlan? = UserDefaults.standard.string(forKey: "bandPlan").map {
+        // An unrecognised value — "none", or a plan from a later version — means off.
+        BandPlan(rawValue: $0)
+    } ?? .systemDefault {
+        didSet { UserDefaults.standard.set(bandPlan?.rawValue ?? "none", forKey: "bandPlan") }
+    }
+
     var ports: [SerialPortInfo] = []
     var selectedPort: String?
     /// 115200 behind the Arduino bridge; 38400 straight into the analyzer.
@@ -339,12 +357,43 @@ final class AnalyzerModel {
     /// toggle governs the comparison overlay, while the selection is always the primary
     /// dataset and is always drawn. Leaving it out cropped a 1-170 MHz trace to the
     /// window of whatever else happened to be visible.
-    var frequencyWindow: ClosedRange<Double>? {
+    var frequencyWindow: ClosedRange<Double>? { zoomRange ?? measuredExtent }
+
+    /// Everything on screen, whether or not the charts are zoomed into part of it.
+    private var measuredExtent: ClosedRange<Double>? {
         var megahertz = displayedPoints.map(\.frequency.megahertz)
         megahertz += visibleTraces.flatMap { $0.points.map(\.frequency.megahertz) }
         guard let low = megahertz.min(), let high = megahertz.max(), high > low else { return nil }
         let margin = (high - low) * 0.01
         return Swift.max(0, low - margin)...(high + margin)
+    }
+
+    /// The window a band zoom asks for, when it is one the data can honour.
+    ///
+    /// Two refusals. A band the trace never reaches would leave an empty chart with an
+    /// axis over a frequency nothing was measured at — the trace wins. And a zoom does
+    /// not apply while a sweep is running: the operator watching a 1–170 MHz measurement
+    /// arrive wants to see it arrive, not a 200 kHz window that stays blank until the
+    /// sweep gets there. It comes back when the measurement finishes.
+    var zoomRange: ClosedRange<Double>? {
+        guard let band = zoomedBand, !isSweeping else { return nil }
+        let low = band.range.lowerBound.megahertz
+        let high = band.range.upperBound.megahertz
+        guard let extent = measuredExtent, extent.overlaps(low...high) else { return nil }
+        let margin = (high - low) * 0.05
+        return Swift.max(0, low - margin)...(high + margin)
+    }
+
+    /// Clicking the band already zoomed to zooms back out.
+    func toggleZoom(to band: AmateurBand) {
+        zoomedBand = zoomedBand == band ? nil : band
+    }
+
+    /// Only the samples inside the zoom, so that the axes — and the readouts — describe
+    /// the part of the sweep on screen rather than the whole of it.
+    func withinWindow(_ points: [MeasurementPoint]) -> [MeasurementPoint] {
+        guard let window = zoomRange else { return points }
+        return points.filter { window.contains($0.frequency.megahertz) }
     }
 
     /// The correction belongs to the live measurement only.
@@ -406,12 +455,28 @@ final class AnalyzerModel {
         )
     }
 
+    /// The part of the displayed trace the charts are actually showing.
+    ///
+    /// Everything a reader can see on the SWR, R/X and Smith views is derived from this,
+    /// so a zoomed chart and the readout under it always describe the same samples. The
+    /// analyses that need the whole measurement — the cable fit, the TDR, the feedline
+    /// detection — deliberately do not come through here: a 200 kHz slice cannot say
+    /// anything about a cable, and would say it confidently.
+    var visiblePoints: [MeasurementPoint] { withinWindow(displayedPoints) }
+
+    var visibleSweep: Sweep {
+        guard zoomRange != nil else { return displayedSweep }
+        var sweep = displayedSweep
+        sweep.points = visiblePoints
+        return sweep
+    }
+
     /// The lowest SWR, interpolated below the measurement grid.
-    var minimumSWR: SWRMinimum? { displayedSweep.minimumSWR }
+    var minimumSWR: SWRMinimum? { visibleSweep.minimumSWR }
 
     /// Where the reactance actually crosses zero. Not the same frequency as the SWR
     /// minimum unless the resistance there happens to be the system impedance.
-    var resonance: Resonance? { displayedSweep.principalResonance }
+    var resonance: Resonance? { visibleSweep.principalResonance }
 
     /// Every reactance crossing, for when there are too many to be an antenna's.
     var resonances: [Resonance] { displayedSweep.resonances }
@@ -423,10 +488,26 @@ final class AnalyzerModel {
         return estimate
     }
 
+    /// What the displayed trace has to say about each band of the chosen plan.
+    ///
+    /// Of the trace on screen, not of the live measurement: a file loaded for comparison
+    /// is exactly the thing an operator wants read against the bands.
+    var bandSummaries: [BandSummary] {
+        guard let bandPlan else { return [] }
+        return displayedSweep.bandSummaries(for: bandPlan)
+    }
+
+    /// The band a frequency falls in, for the cursor readout.
+    func band(at megahertz: Double) -> AmateurBand? {
+        bandPlan?.band(at: .megahertz(megahertz))
+    }
+
     /// The measured sample nearest the minimum, for the marker on the chart.
     var bestMatch: MeasurementPoint? {
         guard let index = minimumSWR?.sampleIndex else { return nil }
-        let points = displayedPoints
+        // The index belongs to the sweep the minimum was taken from, which is the
+        // zoomed one whenever there is a zoom.
+        let points = visiblePoints
         return points.indices.contains(index) ? points[index] : nil
     }
 

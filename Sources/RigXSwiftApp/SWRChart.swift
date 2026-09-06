@@ -14,6 +14,8 @@ struct SWRChart: View {
     var strings: Strings
     /// The window shared by every chart, when more than one trace is on screen.
     var frequencyWindow: ClosedRange<Double>?
+    /// Which amateur bands to shade behind the trace. Nil draws none.
+    var bandPlan: BandPlan?
 
     /// One plotted sample.
     ///
@@ -38,8 +40,14 @@ struct SWRChart: View {
         let peak = (samples + raw + comparisons.flatMap(\.samples)).compactMap(\.swr).max()
         let ceiling = Self.ceiling(for: peak)
         let span = frequencyWindow ?? Self.frequencySpan(samples + raw + comparisons.flatMap(\.samples))
+        // Filtered against the span the chart actually draws, not against the sweep:
+        // the two differ whenever a loaded trace widens the shared window.
+        let bands = bandPlan?.bands(overlapping: .megahertz(span.lowerBound)...(.megahertz(span.upperBound))) ?? []
 
         Chart {
+            // First, so everything else is drawn on top of it.
+            BandShading(bands: bands, span: span)
+
             if ceiling > 2 {
                 RuleMark(y: .value("SWR", 2))
                     .foregroundStyle(.secondary.opacity(0.35))
@@ -81,6 +89,11 @@ struct SWRChart: View {
                 )
                 .interpolationMethod(.monotone)
                 .foregroundStyle(.tint)
+                // Where the samples are few — a band zoom over a coarse grid can leave
+                // one or two — a line draws nothing at all and the chart reads as empty
+                // when it is merely sparse. The dots say how much was actually measured.
+                .symbol(.circle)
+                .symbolSize(samples.count <= 40 ? 26 : 0)
             }
 
             if let cursorFrequency {
@@ -109,6 +122,7 @@ struct SWRChart: View {
         // Left to itself, Charts rounds the domain outwards and can run the axis below
         // zero — a frequency that does not exist. Pin it to the measurement instead.
         .chartXScale(domain: span)
+        .bandNames(bands, span: span)
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 9)) { value in
                 AxisGridLine().foregroundStyle(.secondary.opacity(0.18))
